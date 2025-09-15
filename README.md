@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
 ![Flask](https://img.shields.io/badge/flask-v2.3+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Status](https://img.shields.io/badge/status-hackathon--ready-brightgreen.svg)
+
 
 **An intelligent Decision-Support System (DSS) for Indian Railways Section Controllers that uses AI and Operations Research to optimize train traffic and minimize network-wide delays.**
 

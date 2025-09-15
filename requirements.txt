@@ -4,17 +4,12 @@
 Flask==2.3.3
 flask-cors==4.0.0
 
-# Development and Testing
-pytest==7.4.2
-pytest-flask==1.2.0
-
-# Type Checking (optional but recommended)
-mypy==1.5.1
-
-# Code Formatting (optional but recommended)
-black==23.7.0
-flake8==6.0.0
-
-# Additional utilities that might be useful
-python-dateutil==2.8.2
+# HTTP requests for testing/demo scripts
 requests==2.31.0
+
+# Optional Development Tools (uncomment if needed)
+# pytest==7.4.2
+# pytest-flask==1.2.0
+# mypy==1.5.1
+# black==23.7.0
+# flake8==6.0.0

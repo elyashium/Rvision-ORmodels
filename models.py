@@ -1,6 +1,7 @@
 # models.py
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
+from pathfinding import NetworkGraph, RouteOptimizer, Route
 
 class Train:
     """Represents a train in the railway network with its current state and schedule."""
@@ -29,6 +30,11 @@ class Train:
         self.initial_reported_delay_mins: int = train_data.get('Initial_Reported_Delay_Mins', 0)
         self.actual_delay_mins: int = train_data.get('Actual_Delay_Mins', 0)
         self.current_location: str = self.section_start
+        
+        # Route information
+        self.primary_route: Optional[Route] = None
+        self.alternative_routes: List[Route] = []
+        self.current_route: Optional[Route] = None
         
         # Derived priority based on train type
         self.priority: int = self._calculate_priority()
@@ -129,6 +135,39 @@ class Train:
     def update_track_condition(self, condition: str) -> None:
         """Update track condition which may affect travel time."""
         self.track_condition = condition
+    
+    def set_routes(self, primary_route: Route, alternative_routes: List[Route] = None) -> None:
+        """Set the primary and alternative routes for this train."""
+        self.primary_route = primary_route
+        self.alternative_routes = alternative_routes or []
+        self.current_route = primary_route
+    
+    def switch_to_alternative_route(self, route_index: int = 0) -> bool:
+        """Switch to an alternative route."""
+        if route_index < len(self.alternative_routes):
+            self.current_route = self.alternative_routes[route_index]
+            self.status = f"Rerouted via {self.current_route.route_type} route"
+            return True
+        return False
+    
+    def get_current_route_info(self) -> Dict[str, Any]:
+        """Get information about the current route."""
+        if not self.current_route:
+            return {
+                "route_status": "no_route",
+                "origin": self.section_start,
+                "destination": self.section_end
+            }
+        
+        return {
+            "route_status": "active",
+            "route_type": self.current_route.route_type,
+            "stations": self.current_route.stations,
+            "total_time_minutes": self.current_route.total_time_minutes,
+            "total_distance_km": self.current_route.total_distance_km,
+            "segment_count": len(self.current_route.segments),
+            "alternative_routes_available": len(self.alternative_routes)
+        }
 
 
 class RailwayNetwork:
@@ -138,27 +177,59 @@ class RailwayNetwork:
     """
     
     def __init__(self, schedule_data: List[Dict]):
+        # Initialize network graph and route optimizer
+        self.network_graph = NetworkGraph("network_graph.json")
+        self.route_optimizer = RouteOptimizer(self.network_graph)
+        
         # Initialize all trains from the schedule data
         self.trains: Dict[str, Train] = {
             train_data['Train_ID']: Train(train_data) 
             for train_data in schedule_data
         }
         
-        # Model the physical infrastructure
-        # In a real system, this would be much more complex
+        # Initialize routes for all trains
+        self._initialize_train_routes()
+        
+        # Model the physical infrastructure (simplified for demo)
         self.platforms: Dict[str, Dict[int, Optional[str]]] = {
-            "NDLS": {1: None, 2: None, 3: None},  # New Delhi Station
-            "ANVR": {1: None, 2: None, 3: None},  # Anand Vihar
-            "GZB": {1: None, 2: None, 3: None},   # Ghaziabad
+            station_code: {i: None for i in range(1, station_data.get("platforms", 4) + 1)}
+            for station_code, station_data in self.network_graph.stations.items()
         }
         
-        # Track segments between stations
-        self.tracks: Dict[str, Optional[str]] = {
-            "NDLS-ANVR": None,  # Value will be train_id if occupied
-            "ANVR-GZB": None,
-            "GZB-ANVR": None,   # Reverse direction
-            "ANVR-NDLS": None,
+        # Track occupancy (which train is currently on which track)
+        self.track_occupancy: Dict[str, Optional[str]] = {
+            track_id: None for track_id in self.network_graph.tracks.keys()
         }
+
+    def _initialize_train_routes(self):
+        """Initialize primary and alternative routes for all trains."""
+        print("🗺️  NETWORK: Initializing routes for all trains...")
+        
+        for train in self.trains.values():
+            # Find primary route
+            primary_route = self.route_optimizer.find_best_route(
+                train.section_start, 
+                train.section_end, 
+                train.train_type, 
+                "time"
+            )
+            
+            # Find alternative routes
+            alternative_routes = self.route_optimizer.find_alternative_routes(
+                train.section_start, 
+                train.section_end, 
+                train.train_type, 
+                max_alternatives=2
+            )
+            
+            # Remove primary route from alternatives if it appears there
+            alternative_routes = [r for r in alternative_routes if r != primary_route]
+            
+            if primary_route:
+                train.set_routes(primary_route, alternative_routes)
+                print(f"   ✅ {train.id}: {len(alternative_routes)} alternative routes found")
+            else:
+                print(f"   ⚠️  {train.id}: No route found from {train.section_start} to {train.section_end}")
 
     def get_train(self, train_id: str) -> Optional[Train]:
         """Retrieve a train by its ID."""
@@ -167,8 +238,19 @@ class RailwayNetwork:
     def apply_event(self, event_data: Dict) -> bool:
         """
         Apply a disruption event to the network state.
-        This is how external events (reported by railway staff) affect the digital twin.
+        This handles both train-specific events and network-wide events.
         """
+        event_type = event_data.get('event_type', 'delay')
+        
+        if event_type == 'track_failure':
+            return self._handle_track_failure_event(event_data)
+        elif event_type == 'track_repair':
+            return self._handle_track_repair_event(event_data)
+        else:
+            return self._handle_train_event(event_data)
+    
+    def _handle_train_event(self, event_data: Dict) -> bool:
+        """Handle train-specific events (delays, etc.)."""
         train_id = event_data.get('train_id')
         train = self.get_train(train_id)
         
@@ -194,19 +276,103 @@ class RailwayNetwork:
         print(f"   Reason: {reason}")
         
         return True
+    
+    def _handle_track_failure_event(self, event_data: Dict) -> bool:
+        """Handle track failure events that affect the entire network."""
+        track_id = event_data.get('track_id')
+        reason = event_data.get('description', 'Track failure')
+        
+        if not track_id:
+            print("ERROR: Track failure event must specify track_id")
+            return False
+        
+        # Disable the track in the network graph
+        success = self.network_graph.disable_track(track_id, reason)
+        
+        if success:
+            # Find all trains that might be affected and recalculate their routes
+            affected_trains = self._find_trains_using_track(track_id)
+            
+            for train in affected_trains:
+                # Try to find alternative routes
+                alternative_routes = self.route_optimizer.find_alternative_routes(
+                    train.section_start, 
+                    train.section_end, 
+                    train.train_type, 
+                    max_alternatives=3
+                )
+                
+                if alternative_routes:
+                    train.alternative_routes = alternative_routes
+                    print(f"   🔄 {train.id}: {len(alternative_routes)} alternative routes found after track failure")
+                else:
+                    print(f"   ⚠️  {train.id}: No alternative routes available!")
+            
+            print(f"🚫 TRACK FAILURE: {track_id} - {len(affected_trains)} trains affected")
+            return True
+        
+        return False
+    
+    def _handle_track_repair_event(self, event_data: Dict) -> bool:
+        """Handle track repair events that restore network capacity."""
+        track_id = event_data.get('track_id')
+        
+        if not track_id:
+            print("ERROR: Track repair event must specify track_id")
+            return False
+        
+        success = self.network_graph.enable_track(track_id)
+        
+        if success:
+            # Recalculate routes for all trains to take advantage of restored capacity
+            self._initialize_train_routes()
+            print(f"✅ TRACK REPAIRED: {track_id} - Routes recalculated for all trains")
+            return True
+        
+        return False
+    
+    def _find_trains_using_track(self, track_id: str) -> List[Train]:
+        """Find all trains whose current route uses the specified track."""
+        affected_trains = []
+        
+        for train in self.trains.values():
+            if train.current_route:
+                for segment in train.current_route.segments:
+                    if segment.track_id == track_id:
+                        affected_trains.append(train)
+                        break
+        
+        return affected_trains
 
     def get_state_snapshot(self) -> Dict:
         """
         Returns a complete, serializable snapshot of the current network state.
         This is useful for APIs and debugging.
         """
+        # Get train information with routing details
+        trains_info = {}
+        for train_id, train in self.trains.items():
+            train_info = train.get_current_status_info()
+            train_info["route_info"] = train.get_current_route_info()
+            trains_info[train_id] = train_info
+        
+        # Get network status
+        operational_tracks = sum(1 for track_data in self.network_graph.tracks.values() 
+                               if track_data.get("status") == "operational")
+        failed_tracks = sum(1 for track_data in self.network_graph.tracks.values() 
+                          if track_data.get("status") == "disabled")
+        
         return {
-            "trains": {
-                train_id: train.get_current_status_info() 
-                for train_id, train in self.trains.items()
-            },
+            "trains": trains_info,
             "platforms": self.platforms,
-            "tracks": self.tracks,
+            "track_occupancy": self.track_occupancy,
+            "network_status": {
+                "total_stations": len(self.network_graph.stations),
+                "total_tracks": len(self.network_graph.tracks),
+                "operational_tracks": operational_tracks,
+                "failed_tracks": failed_tracks,
+                "network_health": "healthy" if failed_tracks == 0 else "degraded"
+            },
             "timestamp": datetime.now().isoformat()
         }
 

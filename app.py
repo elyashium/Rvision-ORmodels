@@ -235,6 +235,163 @@ def get_all_trains():
     except Exception as e:
         return jsonify({"error": f"Failed to get trains: {str(e)}"}), 500
 
+@app.route('/api/track-failure', methods=['POST'])
+def report_track_failure():
+    """
+    Report a track failure event.
+    
+    Expected JSON payload:
+    {
+        "track_id": "NDLS_ANVR_MAIN",
+        "description": "Signal failure on main line",
+        "event_type": "track_failure"
+    }
+    """
+    try:
+        if not network:
+            return jsonify({"error": "System not initialized"}), 500
+        
+        event_data = request.json
+        
+        if not event_data:
+            return jsonify({"error": "No event data provided"}), 400
+        
+        # Validate required fields for track failure
+        if 'track_id' not in event_data:
+            return jsonify({"error": "Missing required field: track_id"}), 400
+        
+        # Set event type
+        event_data['event_type'] = 'track_failure'
+        
+        print(f"\n🚫 TRACK FAILURE REPORTED: {event_data}")
+        
+        # Apply the track failure event
+        success = network.apply_event(event_data)
+        
+        if not success:
+            return jsonify({
+                "error": f"Failed to apply track failure for {event_data.get('track_id')}"
+            }), 400
+        
+        # Get updated network state
+        network_state = network.get_state_snapshot()
+        
+        response = {
+            "status": "success",
+            "event_processed": event_data,
+            "network_state": network_state,
+            "message": f"Track failure applied to {event_data.get('track_id')}. Alternative routes calculated.",
+            "timestamp": network_state["timestamp"]
+        }
+        
+        print(f"✅ TRACK FAILURE PROCESSED")
+        
+        return jsonify(response)
+    
+    except Exception as e:
+        print(f"❌ Error processing track failure: {e}")
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+@app.route('/api/track-repair', methods=['POST'])
+def report_track_repair():
+    """
+    Report a track repair event.
+    
+    Expected JSON payload:
+    {
+        "track_id": "NDLS_ANVR_MAIN",
+        "description": "Track maintenance completed",
+        "event_type": "track_repair"
+    }
+    """
+    try:
+        if not network:
+            return jsonify({"error": "System not initialized"}), 500
+        
+        event_data = request.json
+        
+        if not event_data:
+            return jsonify({"error": "No event data provided"}), 400
+        
+        # Validate required fields
+        if 'track_id' not in event_data:
+            return jsonify({"error": "Missing required field: track_id"}), 400
+        
+        # Set event type
+        event_data['event_type'] = 'track_repair'
+        
+        print(f"\n✅ TRACK REPAIR REPORTED: {event_data}")
+        
+        # Apply the track repair event
+        success = network.apply_event(event_data)
+        
+        if not success:
+            return jsonify({
+                "error": f"Failed to apply track repair for {event_data.get('track_id')}"
+            }), 400
+        
+        # Get updated network state
+        network_state = network.get_state_snapshot()
+        
+        response = {
+            "status": "success",
+            "event_processed": event_data,
+            "network_state": network_state,
+            "message": f"Track {event_data.get('track_id')} repaired. Routes recalculated for optimal efficiency.",
+            "timestamp": network_state["timestamp"]
+        }
+        
+        print(f"✅ TRACK REPAIR PROCESSED")
+        
+        return jsonify(response)
+    
+    except Exception as e:
+        print(f"❌ Error processing track repair: {e}")
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+@app.route('/api/network-status', methods=['GET'])
+def get_network_status():
+    """Get detailed network topology and status information."""
+    try:
+        if not network:
+            return jsonify({"error": "System not initialized"}), 500
+        
+        # Get track status information
+        tracks_status = {}
+        for track_id, track_data in network.network_graph.tracks.items():
+            tracks_status[track_id] = {
+                "from": track_data.get("from"),
+                "to": track_data.get("to"),
+                "status": track_data.get("status", "operational"),
+                "distance_km": track_data.get("distance_km"),
+                "travel_time_minutes": track_data.get("travel_time_minutes"),
+                "track_type": track_data.get("track_type"),
+                "priority": track_data.get("priority"),
+                "disable_reason": track_data.get("disable_reason")
+            }
+        
+        # Get station information
+        stations_info = {}
+        for station_code, station_data in network.network_graph.stations.items():
+            stations_info[station_code] = {
+                "name": station_data.get("name"),
+                "type": station_data.get("type"),
+                "platforms": station_data.get("platforms"),
+                "capacity_per_hour": station_data.get("capacity_per_hour")
+            }
+        
+        return jsonify({
+            "status": "success",
+            "network_topology": {
+                "stations": stations_info,
+                "tracks": tracks_status,
+                "network_health": network.get_state_snapshot()["network_status"]
+            }
+        })
+    
+    except Exception as e:
+        return jsonify({"error": f"Failed to get network status: {str(e)}"}), 500
+
 @app.route('/api/system-info', methods=['GET'])
 def get_system_info():
     """Get information about the system configuration."""
@@ -244,8 +401,11 @@ def get_system_info():
             "priority_weights": PRIORITY_WEIGHTS,
             "action_penalties": ACTION_PENALTIES,
             "total_trains": len(network.trains) if network else 0,
-            "available_stations": list(network.platforms.keys()) if network else [],
-            "optimization_enabled": optimizer is not None
+            "available_stations": list(network.network_graph.stations.keys()) if network and network.network_graph else [],
+            "total_tracks": len(network.network_graph.tracks) if network and network.network_graph else 0,
+            "optimization_enabled": optimizer is not None,
+            "pathfinding_enabled": True,
+            "rerouting_enabled": True
         }
     })
 
@@ -273,10 +433,13 @@ if __name__ == '__main__':
     print("📡 API Endpoints available:")
     print("   GET  /                     - Health check")
     print("   GET  /api/state            - Get current network state")
-    print("   POST /api/report-event     - Report disruption event")
+    print("   POST /api/report-event     - Report train disruption event")
+    print("   POST /api/track-failure    - Report track failure event")
+    print("   POST /api/track-repair     - Report track repair event")
     print("   POST /api/accept-recommendation - Accept AI recommendation")
     print("   POST /api/reset            - Reset simulation")
     print("   GET  /api/trains           - Get all train information")
+    print("   GET  /api/network-status   - Get network topology and status")
     print("   GET  /api/system-info      - Get system configuration")
     print("="*50)
     

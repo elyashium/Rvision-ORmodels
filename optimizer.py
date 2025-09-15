@@ -252,16 +252,27 @@ class Optimizer:
                 }
                 solutions.append(solution)
             
-            # Route optimization (for goods trains and lower priority)
-            if train.train_type in ['Goods', 'Local'] or train.priority >= 4:
-                solution = {
-                    "solution_id": f"REROUTE_{train_id}",
-                    "action_type": "Reroute",
-                    "train_id": train_id,
-                    "duration_mins": 5,  # Small delay for rerouting
-                    "description": f"Reroute {train.get_name()} via alternative section"
-                }
-                solutions.append(solution)
+            # Intelligent rerouting (for goods trains and lower priority)
+            if (train.train_type in ['Goods', 'Local'] or train.priority >= 4) and len(train.alternative_routes) > 0:
+                for i, alt_route in enumerate(train.alternative_routes):
+                    # Calculate additional time for alternative route
+                    additional_time = max(0, alt_route.total_time_minutes - train.current_route.total_time_minutes) if train.current_route else alt_route.total_time_minutes
+                    
+                    solution = {
+                        "solution_id": f"REROUTE_{train_id}_{i}",
+                        "action_type": "Reroute",
+                        "train_id": train_id,
+                        "duration_mins": additional_time,
+                        "route_index": i,
+                        "description": f"Reroute {train.get_name()} via {alt_route.route_type} route (+{additional_time} min)",
+                        "alternative_route": {
+                            "stations": alt_route.stations,
+                            "total_time": alt_route.total_time_minutes,
+                            "total_distance": alt_route.total_distance_km,
+                            "route_type": alt_route.route_type
+                        }
+                    }
+                    solutions.append(solution)
         
         # Emergency solution: Temporary cancellation (only for very low priority trains)
         for train_id in affected_trains:
@@ -387,7 +398,7 @@ class Optimizer:
         enhanced_penalties = {
             "Halt": 1,
             "SpeedAdjust": 0.5,    # Less disruptive than full halt
-            "Reroute": 15,         # Moderate cost for rerouting
+            "Reroute": 5,          # Lower base cost for rerouting (actual cost depends on route)
             "Cancel": 50           # High cost for cancellation
         }
         
@@ -405,8 +416,13 @@ class Optimizer:
         # Duration penalty with train type consideration
         duration_penalty = self._calculate_duration_penalty(duration, train)
         
+        # Special handling for rerouting solutions
+        reroute_penalty = 0
+        if action_type == "Reroute":
+            reroute_penalty = self._calculate_reroute_penalty(solution, train)
+        
         # Calculate base score
-        base_score = action_cost + duration_penalty + weather_penalty + track_penalty
+        base_score = action_cost + duration_penalty + weather_penalty + track_penalty + reroute_penalty
         
         # Apply time adjustment (can be negative for peak hours)
         base_score += time_adjustment
@@ -460,6 +476,39 @@ class Optimizer:
             base_penalty_per_min *= 1.5  # Peak hours are more critical
         
         return duration * base_penalty_per_min
+    
+    def _calculate_reroute_penalty(self, solution: Dict[str, Any], train: Train) -> float:
+        """Calculate penalty for rerouting based on route characteristics."""
+        if 'alternative_route' not in solution:
+            return 10  # Default penalty if no route info
+        
+        alt_route = solution['alternative_route']
+        penalty = 0
+        
+        # Distance penalty - longer routes get higher penalty
+        if train.current_route:
+            distance_increase = alt_route.get('total_distance', 0) - train.current_route.total_distance_km
+            penalty += max(0, distance_increase) * 0.5  # 0.5 penalty per extra km
+        
+        # Route complexity penalty
+        station_count = len(alt_route.get('stations', []))
+        if station_count > 3:  # More than direct route
+            penalty += (station_count - 3) * 2  # 2 penalty per extra stop
+        
+        # Route type penalty
+        route_type = alt_route.get('route_type', 'alternative')
+        if route_type == 'emergency':
+            penalty += 15  # High penalty for emergency routes
+        elif route_type == 'alternative':
+            penalty += 5   # Moderate penalty for alternative routes
+        
+        # Train type adjustments for rerouting
+        if train.train_type == 'Express':
+            penalty *= 1.5  # Express trains are more sensitive to rerouting
+        elif train.train_type == 'Goods':
+            penalty *= 0.7  # Goods trains are more tolerant of rerouting
+        
+        return penalty
 
     def _calculate_confidence(self, best_score: float, all_scores: List[float]) -> str:
         """Calculate confidence level based on score distribution."""

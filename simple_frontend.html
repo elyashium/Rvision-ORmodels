@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R-Vision - Railway Decision Support System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 25px;
+            border: 2px solid #f0f0f0;
+            border-radius: 10px;
+            background: #fafafa;
+        }
+
+        .section h2 {
+            color: #2a5298;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #2a5298;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .train-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .train-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .train-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .train-card h3 {
+            color: #2a5298;
+            margin-bottom: 10px;
+        }
+
+        .train-status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-ontime { background: #d4edda; color: #155724; }
+        .status-delayed { background: #f8d7da; color: #721c24; }
+
+        .priority-badge {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            text-align: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            line-height: 20px;
+            margin-left: 10px;
+        }
+
+        .priority-1 { background: #dc3545; }
+        .priority-2 { background: #fd7e14; }
+        .priority-3 { background: #ffc107; color: #000; }
+        .priority-4 { background: #007bff; }
+        .priority-5 { background: #6c757d; }
+
+        .recommendation {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .recommendation h3 {
+            margin-bottom: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚂 R-Vision <span style="font-size: 0.6em;">Decision Support System</span></h1>
+            <p>AI-Powered Railway Traffic Optimization for Indian Railways</p>
+        </div>
+
+        <div class="main-content">
+            <!-- System Status Section -->
+            <div class="section">
+                <h2>📊 System Status</h2>
+                <div id="systemStatus">
+                    <div class="loading">Connecting to R-Vision system...</div>
+                </div>
+            </div>
+
+            <!-- Current Trains Section -->
+            <div class="section">
+                <h2>🚂 Current Trains</h2>
+                <button class="btn" onclick="loadTrains()">🔄 Refresh Train Status</button>
+                <div id="trainsContainer">
+                    <div class="loading">Loading train information...</div>
+                </div>
+            </div>
+
+            <!-- Report Event Section -->
+            <div class="section">
+                <h2>🚨 Report Disruption Event</h2>
+                <form id="eventForm">
+                    <div class="form-group">
+                        <label for="trainSelect">Select Train:</label>
+                        <select id="trainSelect" required>
+                            <option value="">-- Select a train --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="delayMinutes">Delay (minutes):</label>
+                        <input type="number" id="delayMinutes" min="1" max="300" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Description (optional):</label>
+                        <input type="text" id="description" placeholder="e.g., Signal failure, track maintenance">
+                    </div>
+                    <button type="submit" class="btn">🚨 Report Event & Get AI Recommendation</button>
+                </form>
+                <div id="eventResult"></div>
+            </div>
+
+            <!-- Controls Section -->
+            <div class="section">
+                <h2>⚙️ System Controls</h2>
+                <button class="btn" onclick="resetSystem()" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+                    🔄 Reset Simulation
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5001';
+        let currentTrains = [];
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            checkSystemHealth();
+            loadTrains();
+        });
+
+        // Check if the backend system is running
+        async function checkSystemHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/`);
+                const data = await response.json();
+                
+                document.getElementById('systemStatus').innerHTML = `
+                    <div class="success">
+                        ✅ <strong>System Online</strong><br>
+                        Service: ${data.service}<br>
+                        Version: ${data.version}
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('systemStatus').innerHTML = `
+                    <div class="error">
+                        ❌ <strong>System Offline</strong><br>
+                        Please ensure the R-Vision backend is running on port 5001.<br>
+                        Run: <code>python app.py</code>
+                    </div>
+                `;
+            }
+        }
+
+        // Load all trains from the system
+        async function loadTrains() {
+            try {
+                document.getElementById('trainsContainer').innerHTML = '<div class="loading">Loading trains...</div>';
+                
+                const response = await fetch(`${API_BASE}/api/trains`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    currentTrains = data.trains;
+                    displayTrains(data.trains);
+                    updateTrainSelect(data.trains);
+                } else {
+                    throw new Error(data.error || 'Failed to load trains');
+                }
+            } catch (error) {
+                document.getElementById('trainsContainer').innerHTML = `
+                    <div class="error">❌ Error loading trains: ${error.message}</div>
+                `;
+            }
+        }
+
+        // Display trains in a grid layout
+        function displayTrains(trains) {
+            const container = document.getElementById('trainsContainer');
+            
+            if (trains.length === 0) {
+                container.innerHTML = '<div class="loading">No trains found</div>';
+                return;
+            }
+
+            const trainsHtml = trains.map(train => {
+                const statusClass = train.status.toLowerCase().includes('delayed') ? 'status-delayed' : 'status-ontime';
+                const priorityNames = {1: 'Highest', 2: 'High', 3: 'Medium', 4: 'Low', 5: 'Lowest'};
+                
+                return `
+                    <div class="train-card">
+                        <h3>${train.train_name}
+                            <span class="priority-badge priority-${train.priority}">${train.priority}</span>
+                        </h3>
+                        <p><strong>ID:</strong> ${train.train_id}</p>
+                        <p><strong>Priority:</strong> ${priorityNames[train.priority] || 'Unknown'} (${train.priority})</p>
+                        <p><strong>Route:</strong> ${train.current_location} → ${train.next_station || 'Final'}</p>
+                        <p><strong>Status:</strong> <span class="train-status ${statusClass}">${train.status}</span></p>
+                        <p><strong>Delay:</strong> ${train.current_delay_mins} minutes</p>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `<div class="train-grid">${trainsHtml}</div>`;
+        }
+
+        // Update the train selection dropdown
+        function updateTrainSelect(trains) {
+            const select = document.getElementById('trainSelect');
+            select.innerHTML = '<option value="">-- Select a train --</option>';
+            
+            trains.forEach(train => {
+                const option = document.createElement('option');
+                option.value = train.train_id;
+                option.textContent = `${train.train_name} (${train.train_id})`;
+                select.appendChild(option);
+            });
+        }
+
+        // Handle event form submission
+        document.getElementById('eventForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const trainId = document.getElementById('trainSelect').value;
+            const delayMinutes = parseInt(document.getElementById('delayMinutes').value);
+            const description = document.getElementById('description').value;
+            
+            const eventData = {
+                train_id: trainId,
+                delay_minutes: delayMinutes,
+                event_type: 'delay',
+                description: description || `Manual delay report: ${delayMinutes} minutes`
+            };
+
+            try {
+                document.getElementById('eventResult').innerHTML = '<div class="loading">🧠 AI is analyzing the situation...</div>';
+                
+                const response = await fetch(`${API_BASE}/api/report-event`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(eventData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    displayEventResult(result);
+                    loadTrains(); // Refresh train status
+                } else {
+                    throw new Error(result.error || 'Failed to process event');
+                }
+            } catch (error) {
+                document.getElementById('eventResult').innerHTML = `
+                    <div class="error">❌ Error processing event: ${error.message}</div>
+                `;
+            }
+        });
+
+        // Display the AI's analysis and recommendation
+        function displayEventResult(result) {
+            const optimization = result.optimization_result;
+            let html = '';
+
+            if (optimization.status === 'ConflictFound') {
+                const conflict = optimization.conflict_info;
+                const recommendation = optimization.recommendation;
+
+                html = `
+                    <div class="error" style="margin-top: 20px;">
+                        <h3>⚠️ Conflict Detected</h3>
+                        <p><strong>Location:</strong> ${conflict.location}</p>
+                        <p><strong>Affected Trains:</strong> ${conflict.affected_trains.join(', ')}</p>
+                        <p><strong>Severity:</strong> ${conflict.severity}</p>
+                        <p><strong>Details:</strong> ${conflict.details}</p>
+                    </div>
+                    
+                    <div class="recommendation">
+                        <h3>💡 AI Recommendation</h3>
+                        <p><strong>Action:</strong> ${recommendation.recommendation_text}</p>
+                        <p><strong>Confidence:</strong> ${recommendation.confidence}</p>
+                        <p><strong>Impact Score:</strong> ${recommendation.score}</p>
+                        <p><strong>Reasoning:</strong> ${recommendation.reasoning}</p>
+                        <button class="btn" onclick="acceptRecommendation('${recommendation.recommendation_id}')" 
+                                style="margin-top: 15px; background: white; color: #28a745; border: 2px solid white;">
+                            ✅ Accept Recommendation
+                        </button>
+                    </div>
+                `;
+            } else if (optimization.status === 'NoConflict') {
+                html = `
+                    <div class="success" style="margin-top: 20px;">
+                        <h3>✅ No Conflicts Detected</h3>
+                        <p>The delay has been applied, but no immediate conflicts were detected. All trains can proceed normally.</p>
+                    </div>
+                `;
+            }
+
+            document.getElementById('eventResult').innerHTML = html;
+        }
+
+        // Accept an AI recommendation
+        async function acceptRecommendation(recommendationId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/accept-recommendation`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recommendation_id: recommendationId })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('✅ Recommendation accepted and applied successfully!');
+                    loadTrains(); // Refresh train status
+                } else {
+                    throw new Error(result.error || 'Failed to accept recommendation');
+                }
+            } catch (error) {
+                alert(`❌ Error accepting recommendation: ${error.message}`);
+            }
+        }
+
+        // Reset the simulation
+        async function resetSystem() {
+            if (confirm('Are you sure you want to reset the simulation to its initial state?')) {
+                try {
+                    const response = await fetch(`${API_BASE}/api/reset`, { method: 'POST' });
+                    const result = await response.json();
+                    
+                    if (result.status === 'success') {
+                        alert('✅ System reset successfully!');
+                        loadTrains();
+                        document.getElementById('eventResult').innerHTML = '';
+                        document.getElementById('eventForm').reset();
+                    } else {
+                        throw new Error(result.error || 'Failed to reset system');
+                    }
+                } catch (error) {
+                    alert(`❌ Error resetting system: ${error.message}`);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

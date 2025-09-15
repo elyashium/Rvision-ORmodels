@@ -395,32 +395,3 @@ curl http://localhost:5001/api/network-status
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🏆 Hackathon Readiness
-
-### Demonstration Points
-- ✅ **Technical Excellence**: Advanced algorithms, clean architecture
-- ✅ **Real-world Problem**: Addresses actual Indian Railways challenges
-- ✅ **Innovation**: Novel approach combining OR and AI
-- ✅ **Scalability**: Production-ready design patterns
-- ✅ **Impact**: Measurable delay reduction and efficiency gains
-
-### Presentation Flow
-1. **Problem Statement**: Manual railway operations overwhelmed by complexity
-2. **Technical Approach**: OR-based optimization with network graph topology
-3. **Live Demo**: Track failure → Conflict detection → AI recommendation
-4. **Innovation**: Human-in-the-loop design without API dependencies
-5. **Impact**: Network-wide delay minimization with intelligent routing
-
----
-
-## 📞 Contact & Support
-
-For questions, issues, or contributions, please:
-- Open an issue on GitHub
-- Contact the development team
-- Review the documentation and examples
-
-**Built with ❤️ for Indian Railways modernization and hackathon excellence!**

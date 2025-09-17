@@ -1,0 +1,337 @@
+{
+  "network_info": {
+    "name": "Delhi-Ghaziabad Railway Corridor",
+    "description": "Simplified network graph representing major stations and connecting tracks",
+    "total_stations": 8,
+    "total_tracks": 12
+  },
+  "stations": {
+    "NDLS": {
+      "name": "New Delhi Station",
+      "type": "major_junction",
+      "platforms": 16,
+      "coordinates": {
+        "lat": 28.6431,
+        "lon": 77.2197
+      },
+      "capacity_per_hour": 20
+    },
+    "ANVR": {
+      "name": "Anand Vihar Terminal",
+      "type": "terminal",
+      "platforms": 8,
+      "coordinates": {
+        "lat": 28.6469,
+        "lon": 77.315
+      },
+      "capacity_per_hour": 12
+    },
+    "GZB": {
+      "name": "Ghaziabad Junction",
+      "type": "major_junction",
+      "platforms": 10,
+      "coordinates": {
+        "lat": 28.6692,
+        "lon": 77.4538
+      },
+      "capacity_per_hour": 15
+    },
+    "SBB": {
+      "name": "Sahibabad",
+      "type": "intermediate",
+      "platforms": 4,
+      "coordinates": {
+        "lat": 28.6731,
+        "lon": 77.3668
+      },
+      "capacity_per_hour": 8
+    },
+    "VVB": {
+      "name": "Vivek Vihar",
+      "type": "intermediate",
+      "platforms": 2,
+      "coordinates": {
+        "lat": 28.6742,
+        "lon": 77.3157
+      },
+      "capacity_per_hour": 6
+    },
+    "SHZM": {
+      "name": "Shaheed Nagar",
+      "type": "small",
+      "platforms": 2,
+      "coordinates": {
+        "lat": 28.6567,
+        "lon": 77.2833
+      },
+      "capacity_per_hour": 4
+    },
+    "DLI": {
+      "name": "Old Delhi Junction",
+      "type": "junction",
+      "platforms": 12,
+      "coordinates": {
+        "lat": 28.6517,
+        "lon": 77.2219
+      },
+      "capacity_per_hour": 18
+    },
+    "MUT": {
+      "name": "Meerut City",
+      "type": "destination",
+      "platforms": 6,
+      "coordinates": {
+        "lat": 28.9845,
+        "lon": 77.7064
+      },
+      "capacity_per_hour": 10
+    }
+  },
+  "tracks": {
+    "NDLS_ANVR_MAIN": {
+      "from": "NDLS",
+      "to": "ANVR",
+      "distance_km": 15.2,
+      "max_speed_kmh": 110,
+      "track_type": "double_line",
+      "capacity_trains_per_hour": 8,
+      "travel_time_minutes": 25,
+      "status": "operational",
+      "priority": "high"
+    },
+    "ANVR_NDLS_MAIN": {
+      "from": "ANVR",
+      "to": "NDLS",
+      "distance_km": 15.2,
+      "max_speed_kmh": 110,
+      "track_type": "double_line",
+      "capacity_trains_per_hour": 8,
+      "travel_time_minutes": 25,
+      "status": "operational",
+      "priority": "high"
+    },
+    "ANVR_GZB_MAIN": {
+      "from": "ANVR",
+      "to": "GZB",
+      "distance_km": 18.7,
+      "max_speed_kmh": 100,
+      "track_type": "double_line",
+      "capacity_trains_per_hour": 6,
+      "travel_time_minutes": 30,
+      "status": "operational",
+      "priority": "high"
+    },
+    "GZB_ANVR_MAIN": {
+      "from": "GZB",
+      "to": "ANVR",
+      "distance_km": 18.7,
+      "max_speed_kmh": 100,
+      "track_type": "double_line",
+      "capacity_trains_per_hour": 6,
+      "travel_time_minutes": 30,
+      "status": "operational",
+      "priority": "high"
+    },
+    "NDLS_SBB_ALT": {
+      "from": "NDLS",
+      "to": "SBB",
+      "distance_km": 22.1,
+      "max_speed_kmh": 80,
+      "track_type": "single_line",
+      "capacity_trains_per_hour": 3,
+      "travel_time_minutes": 35,
+      "status": "operational",
+      "priority": "medium"
+    },
+    "SBB_GZB_ALT": {
+      "from": "SBB",
+      "to": "GZB",
+      "distance_km": 12.3,
+      "max_speed_kmh": 80,
+      "track_type": "single_line",
+      "capacity_trains_per_hour": 3,
+      "travel_time_minutes": 20,
+      "status": "operational",
+      "priority": "medium"
+    },
+    "NDLS_VVB_BYPASS": {
+      "from": "NDLS",
+      "to": "VVB",
+      "distance_km": 16.8,
+      "max_speed_kmh": 60,
+      "track_type": "single_line",
+      "capacity_trains_per_hour": 2,
+      "travel_time_minutes": 40,
+      "status": "operational",
+      "priority": "low"
+    },
+    "VVB_ANVR_BYPASS": {
+      "from": "VVB",
+      "to": "ANVR",
+      "distance_km": 8.2,
+      "max_speed_kmh": 60,
+      "track_type": "single_line",
+      "capacity_trains_per_hour": 2,
+      "travel_time_minutes": 18,
+      "status": "operational",
+      "priority": "low"
+    },
+    "NDLS_DLI_CONNECTOR": {
+      "from": "NDLS",
+      "to": "DLI",
+      "distance_km": 2.1,
+      "max_speed_kmh": 40,
+      "track_type": "double_line",
+      "capacity_trains_per_hour": 10,
+      "travel_time_minutes": 8,
+      "status": "operational",
+      "priority": "high"
+    },
+    "DLI_SHZM_LOCAL": {
+      "from": "DLI",
+      "to": "SHZM",
+      "distance_km": 8.5,
+      "max_speed_kmh": 50,
+      "track_type": "single_line",
+      "capacity_trains_per_hour": 4,
+      "travel_time_minutes": 15,
+      "status": "operational",
+      "priority": "medium"
+    },
+    "SHZM_ANVR_LOCAL": {
+      "from": "SHZM",
+      "to": "ANVR",
+      "distance_km": 11.2,
+      "max_speed_kmh": 50,
+      "track_type": "single_line",
+      "capacity_trains_per_hour": 4,
+      "travel_time_minutes": 20,
+      "status": "operational",
+      "priority": "medium"
+    },
+    "GZB_MUT_EXTENSION": {
+      "from": "GZB",
+      "to": "MUT",
+      "distance_km": 45.2,
+      "max_speed_kmh": 120,
+      "track_type": "double_line",
+      "capacity_trains_per_hour": 4,
+      "travel_time_minutes": 60,
+      "status": "operational",
+      "priority": "high"
+    }
+  },
+  "route_alternatives": {
+    "NDLS_to_ANVR": {
+      "primary": [
+        "NDLS_ANVR_MAIN"
+      ],
+      "alternatives": [
+        [
+          "NDLS_VVB_BYPASS",
+          "VVB_ANVR_BYPASS"
+        ],
+        [
+          "NDLS_DLI_CONNECTOR",
+          "DLI_SHZM_LOCAL",
+          "SHZM_ANVR_LOCAL"
+        ]
+      ]
+    },
+    "ANVR_to_GZB": {
+      "primary": [
+        "ANVR_GZB_MAIN"
+      ],
+      "alternatives": [
+        [
+          "ANVR_NDLS_MAIN",
+          "NDLS_SBB_ALT",
+          "SBB_GZB_ALT"
+        ]
+      ]
+    },
+    "NDLS_to_GZB": {
+      "primary": [
+        "NDLS_ANVR_MAIN",
+        "ANVR_GZB_MAIN"
+      ],
+      "alternatives": [
+        [
+          "NDLS_SBB_ALT",
+          "SBB_GZB_ALT"
+        ],
+        [
+          "NDLS_VVB_BYPASS",
+          "VVB_ANVR_BYPASS",
+          "ANVR_GZB_MAIN"
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "scenario": "priority",
+    "generated_at": "2025-09-16T14:10:01.730859Z",
+    "source_graph": "network_graph.json",
+    "disruption": {
+      "type": "failure",
+      "details": {
+        "track_id": "NDLS_ANVR_MAIN"
+      }
+    },
+    "notes": "Optimized with priority-based routing for express trains",
+    "statistics": {
+      "high_priority_trains": 1,
+      "low_priority_trains": 0,
+      "rerouted_for_priority": 0,
+      "average_low_priority_delay": NaN
+    }
+  },
+  "routes": [
+    {
+      "train_id": "T100",
+      "train_name": "Express",
+      "priority": 1,
+      "path": [
+        "NDLS",
+        "ANVR",
+        "GZB"
+      ],
+      "delay": 0,
+      "status": "priority",
+      "expected_arrival": "20:35"
+    },
+    {
+      "train_id": "T200",
+      "train_name": "Passenger",
+      "priority": 3,
+      "path": [
+        "GZB",
+        "ANVR",
+        "NDLS"
+      ],
+      "delay": 5,
+      "status": "normal",
+      "expected_arrival": "20:40"
+    }
+  ],
+  "trains": [
+    {
+      "id": "T100",
+      "name": "Express",
+      "current_node": "NDLS",
+      "destination": "GZB",
+      "priority": 1,
+      "delay": 0,
+      "status": "priority"
+    },
+    {
+      "id": "T200",
+      "name": "Passenger",
+      "current_node": "GZB",
+      "destination": "NDLS",
+      "priority": 3,
+      "delay": 5,
+      "status": "normal"
+    }
+  ]
+}

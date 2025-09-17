@@ -1,0 +1,338 @@
+{
+  "meta": {
+    "scenario": "failure",
+    "generated_at": "2025-09-16T14:28:00.879819Z",
+    "source_graph": "network_graph.json",
+    "disruption": {
+      "type": "delay",
+      "details": {
+        "train_id": "T100",
+        "delay_minutes": 20
+      }
+    },
+    "notes": "Optimized for infrastructure failures with alternate routing",
+    "statistics": {
+      "failed_tracks": 0,
+      "affected_trains": 5,
+      "cancelled_trains": 0,
+      "average_reroute_delay": 9.0
+    }
+  },
+  "nodes": [
+    {
+      "id": "NDLS",
+      "label": "New Delhi",
+      "type": "major_terminal",
+      "x": 100,
+      "y": 200
+    },
+    {
+      "id": "GZB",
+      "label": "Ghaziabad",
+      "type": "junction",
+      "x": 250,
+      "y": 200
+    },
+    {
+      "id": "SBB",
+      "label": "Sahibabad",
+      "type": "station",
+      "x": 400,
+      "y": 250
+    },
+    {
+      "id": "VVB",
+      "label": "Vivek Vihar",
+      "type": "station",
+      "x": 550,
+      "y": 250
+    },
+    {
+      "id": "ANVT",
+      "label": "Anand Vihar Terminal",
+      "type": "terminal",
+      "x": 700,
+      "y": 200
+    },
+    {
+      "id": "CNB",
+      "label": "Kanpur Central",
+      "type": "major_junction",
+      "x": 850,
+      "y": 200
+    },
+    {
+      "id": "AGC",
+      "label": "Agra Cantt",
+      "type": "junction",
+      "x": 1000,
+      "y": 200
+    },
+    {
+      "id": "TDL",
+      "label": "Tundla Junction",
+      "type": "junction",
+      "x": 1150,
+      "y": 200
+    },
+    {
+      "id": "ALJN",
+      "label": "Aligarh Junction",
+      "type": "junction",
+      "x": 1300,
+      "y": 200
+    },
+    {
+      "id": "MTJ",
+      "label": "Mathura Junction",
+      "type": "junction",
+      "x": 1450,
+      "y": 200
+    },
+    {
+      "id": "SHZM",
+      "label": "Sabzi Mandi",
+      "type": "station",
+      "x": 1600,
+      "y": 250
+    }
+  ],
+  "edges": [
+    {
+      "id": "TR001",
+      "from": "NDLS",
+      "to": "SHZM",
+      "travel_time": 10,
+      "distance": 5,
+      "status": "operational"
+    },
+    {
+      "id": "TR002",
+      "from": "SHZM",
+      "to": "VVB",
+      "travel_time": 15,
+      "distance": 8,
+      "status": "operational"
+    },
+    {
+      "id": "TR003",
+      "from": "VVB",
+      "to": "ANVT",
+      "travel_time": 5,
+      "distance": 2,
+      "status": "operational"
+    },
+    {
+      "id": "TR004",
+      "from": "ANVT",
+      "to": "SBB",
+      "travel_time": 8,
+      "distance": 4,
+      "status": "operational"
+    },
+    {
+      "id": "TR005",
+      "from": "SBB",
+      "to": "GZB",
+      "travel_time": 20,
+      "distance": 12,
+      "status": "operational"
+    },
+    {
+      "id": "TR006",
+      "from": "NDLS",
+      "to": "GZB",
+      "travel_time": 30,
+      "distance": 20,
+      "status": "operational"
+    },
+    {
+      "id": "TR007",
+      "from": "GZB",
+      "to": "ALJN",
+      "travel_time": 90,
+      "distance": 110,
+      "status": "operational"
+    },
+    {
+      "id": "TR008",
+      "from": "ALJN",
+      "to": "TDL",
+      "travel_time": 35,
+      "distance": 40,
+      "status": "operational"
+    },
+    {
+      "id": "TR009",
+      "from": "TDL",
+      "to": "AGC",
+      "travel_time": 25,
+      "distance": 25,
+      "status": "operational"
+    },
+    {
+      "id": "TR010",
+      "from": "AGC",
+      "to": "MTJ",
+      "travel_time": 45,
+      "distance": 50,
+      "status": "operational"
+    },
+    {
+      "id": "TR011",
+      "from": "MTJ",
+      "to": "NDLS",
+      "travel_time": 120,
+      "distance": 145,
+      "status": "operational"
+    },
+    {
+      "id": "TR012",
+      "from": "TDL",
+      "to": "CNB",
+      "travel_time": 180,
+      "distance": 225,
+      "status": "operational"
+    },
+    {
+      "id": "TR013",
+      "from": "ALJN",
+      "to": "CNB",
+      "travel_time": 210,
+      "distance": 260,
+      "status": "operational"
+    },
+    {
+      "id": "TR014",
+      "from": "NDLS",
+      "to": "VVB",
+      "travel_time": 18,
+      "distance": 10,
+      "status": "operational"
+    }
+  ],
+  "trains": [
+    {
+      "id": "T100",
+      "name": "Rajdhani Express",
+      "current_node": "NDLS",
+      "destination": "CNB",
+      "priority": 1,
+      "delay": 15,
+      "type": "express",
+      "scheduled_departure": "08:00",
+      "speed_kmph": 120
+    },
+    {
+      "id": "T200",
+      "name": "Shatabdi Express",
+      "current_node": "GZB",
+      "destination": "AGC",
+      "priority": 1,
+      "delay": 15,
+      "type": "express",
+      "scheduled_departure": "06:30",
+      "speed_kmph": 140
+    },
+    {
+      "id": "T300",
+      "name": "Local Passenger",
+      "current_node": "ANVT",
+      "destination": "GZB",
+      "priority": 3,
+      "delay": 5,
+      "type": "passenger",
+      "scheduled_departure": "09:00",
+      "speed_kmph": 60
+    },
+    {
+      "id": "T400",
+      "name": "Intercity Express",
+      "current_node": "MTJ",
+      "destination": "NDLS",
+      "priority": 2,
+      "delay": 5,
+      "type": "intercity",
+      "scheduled_departure": "07:15",
+      "speed_kmph": 90
+    },
+    {
+      "id": "T500",
+      "name": "Freight Train",
+      "current_node": "TDL",
+      "destination": "CNB",
+      "priority": 5,
+      "delay": 5,
+      "type": "freight",
+      "scheduled_departure": "10:00",
+      "speed_kmph": 50
+    }
+  ],
+  "routes": [
+    {
+      "train_id": "T100",
+      "train_name": "Rajdhani Express",
+      "priority": 1,
+      "path": [
+        "NDLS",
+        "GZB",
+        "ALJN",
+        "CNB"
+      ],
+      "delay": 15,
+      "status": "rerouted",
+      "expected_arrival": "01:43"
+    },
+    {
+      "train_id": "T200",
+      "train_name": "Shatabdi Express",
+      "priority": 1,
+      "path": [
+        "GZB",
+        "ALJN",
+        "TDL",
+        "AGC"
+      ],
+      "delay": 15,
+      "status": "rerouted",
+      "expected_arrival": "22:43"
+    },
+    {
+      "train_id": "T300",
+      "train_name": "Local Passenger",
+      "priority": 3,
+      "path": [
+        "ANVT",
+        "SBB",
+        "GZB"
+      ],
+      "delay": 5,
+      "status": "minor_delay",
+      "expected_arrival": "20:26"
+    },
+    {
+      "train_id": "T400",
+      "train_name": "Intercity Express",
+      "priority": 2,
+      "path": [
+        "MTJ",
+        "NDLS"
+      ],
+      "delay": 5,
+      "status": "minor_delay",
+      "expected_arrival": "21:58"
+    },
+    {
+      "train_id": "T500",
+      "train_name": "Freight Train",
+      "priority": 5,
+      "path": [
+        "TDL",
+        "CNB"
+      ],
+      "delay": 5,
+      "status": "minor_delay",
+      "expected_arrival": "22:58"
+    }
+  ]
+}

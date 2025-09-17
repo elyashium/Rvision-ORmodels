@@ -1,0 +1,7 @@
+# Minimal FastAPI Backend Dependencies
+# Core packages only - guaranteed to work
+
+fastapi
+uvicorn
+networkx
+numpy

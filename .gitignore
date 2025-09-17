@@ -167,3 +167,5 @@ secrets.json
 # Test output
 test_results/
 coverage_reports/
+
+node_modules

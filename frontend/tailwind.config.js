@@ -7,16 +7,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        'rail-dark': '#1f2937',
-        'rail-darker': '#111827',
-        'rail-blue': '#6b7280',
-        'rail-light-blue': '#9ca3af',
-        'rail-accent': '#f9fafb',
+        'rail-dark': '#ffffff',
+        'rail-darker': '#f8f9fa',
+        'rail-blue': '#495057',
+        'rail-light-blue': '#6c757d',
+        'rail-accent': '#000000',
+        'rail-text': '#1a1a1a',
+        'rail-text-secondary': '#4a4a4a',
         'rail-success': '#10b981',
         'rail-warning': '#f59e0b',
         'rail-danger': '#ef4444',
-        'rail-gray': '#4b5563',
-        'rail-light-gray': '#6b7280',
+        'rail-info': '#3b82f6',
+        'rail-gray': '#e5e7eb',
+        'rail-light-gray': '#f3f4f6',
       },
       fontFamily: {
         'mono': ['JetBrains Mono', 'Monaco', 'Consolas', 'monospace'],

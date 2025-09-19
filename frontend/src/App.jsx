@@ -95,30 +95,23 @@ function App() {
   const getHealthStatusIcon = () => {
     switch (systemHealth) {
       case 'healthy':
-        return <CheckCircle className="w-5 h-5 text-rail-success" />;
+        return <CheckCircle className="w-3 h-3 text-rail-success" />;
       case 'degraded':
-        return <AlertTriangle className="w-5 h-5 text-rail-warning" />;
+        return <AlertTriangle className="w-3 h-3 text-rail-warning" />;
       default:
-        return <AlertTriangle className="w-5 h-5 text-rail-danger" />;
+        return <AlertTriangle className="w-3 h-3 text-rail-danger" />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-rail-darker to-rail-dark text-white">
-      {/* Header */}
-      <header className="rail-card m-3 mb-0 px-4 py-3 border-b-0 rounded-b-none">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2">
-              <Train className="w-6 h-6 text-rail-accent" />
-              <div>
-                <h1 className="text-lg font-bold text-white">R-Vision</h1>
-                <p className="text-xs text-gray-500">Intelligent Rail Optimization System</p>
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen bg-white text-rail-text">
+      {/* Premium Notch Header */}
+      <header className="notch-header">
+        <div className="notch-content">
+          <Train className="w-4 h-4 text-rail-text flex-shrink-0" />
+          <span className="text-xs font-semibold text-rail-text whitespace-nowrap">R-Vision</span>
           
-          <div className="flex items-center space-x-4">
+          <div className="notch-expanded flex items-center space-x-3">
             {/* System Health Indicator */}
             <div className="flex items-center space-x-1">
               {getHealthStatusIcon()}
@@ -127,7 +120,7 @@ function App() {
             
             {/* Simulation Status */}
             <div className="flex items-center space-x-1">
-              <div className={`w-2 h-2 rounded-full ${isSimulationRunning ? 'bg-rail-success animate-pulse' : 'bg-rail-gray'}`}></div>
+              <div className={`w-1.5 h-1.5 rounded-full ${isSimulationRunning ? 'bg-rail-success animate-pulse' : 'bg-rail-gray'}`}></div>
               <span className="text-xs font-medium">
                 {isSimulationRunning ? 'Live' : 'Paused'}
               </span>
@@ -136,8 +129,8 @@ function App() {
             {/* Active Trains Count */}
             {networkState && (
               <div className="flex items-center space-x-1">
-                <Activity className="w-3 h-3 text-rail-accent" />
-                <span className="text-xs font-medium">
+                <Activity className="w-3 h-3 text-rail-text" />
+                <span className="text-xs font-medium text-rail-text">
                   {Object.keys(networkState.trains || {}).length} Trains
                 </span>
               </div>
@@ -147,9 +140,9 @@ function App() {
       </header>
 
       {/* Main Layout */}
-      <div className="flex h-[calc(100vh-80px)] p-4 pt-0 gap-4">
+      <div className="flex h-[calc(100vh-20px)] p-3 pt-16 gap-3">
         {/* Left Sidebar - Control Panel */}
-        <div className="w-72 flex flex-col">
+        <div className="w-64 flex flex-col">
           <ControlPanel
             networkState={networkState}
             isSimulationRunning={isSimulationRunning}
@@ -161,9 +154,9 @@ function App() {
         </div>
 
         {/* Main Content - Network Visualization and Alerts */}
-        <div className="flex-1 flex gap-4 min-h-0">
+        <div className="flex-1 flex gap-3 min-h-0">
           {/* Network Visualization */}
-          <div className="flex-1 rail-card p-4 min-h-0">
+          <div className="flex-1 rail-card p-3 min-h-0">
             <NetworkGraph
               networkState={networkState}
               isSimulationRunning={isSimulationRunning}
@@ -171,7 +164,7 @@ function App() {
           </div>
 
           {/* Right Panel - Alerts and Recommendations */}
-          <div className="w-80 flex-shrink-0">
+          <div className="w-72 flex-shrink-0">
             <AlertsAndRecommendations
               alerts={alerts}
               recommendations={recommendations}

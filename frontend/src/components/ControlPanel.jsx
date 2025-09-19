@@ -89,16 +89,16 @@ const ControlPanel = ({
   };
 
   return (
-    <div className="rail-card p-6 h-full flex flex-col">
-      <div className="flex items-center space-x-2 mb-6">
-        <Settings className="w-5 h-5 text-rail-accent" />
-        <h2 className="text-lg font-semibold">Control Panel</h2>
+    <div className="rail-card p-4 h-full flex flex-col">
+      <div className="flex items-center space-x-2 mb-4">
+        <Settings className="w-4 h-4 text-rail-text" />
+        <h2 className="text-sm font-semibold text-rail-text">Control Panel</h2>
       </div>
 
-      <div className="space-y-6 flex-1">
+      <div className="space-y-4 flex-1">
         {/* Schedule Upload Section */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium text-gray-300 uppercase tracking-wide">
+        <div className="space-y-2">
+          <h3 className="text-xs font-medium text-rail-text-secondary uppercase tracking-wide">
             System Initialization
           </h3>
           
@@ -129,7 +129,7 @@ const ControlPanel = ({
         {/* Simulation Controls */}
         {networkState && (
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-gray-300 uppercase tracking-wide">
+            <h3 className="text-xs font-medium text-rail-text-secondary uppercase tracking-wide">
               Simulation Control
             </h3>
             
@@ -156,13 +156,13 @@ const ControlPanel = ({
         {/* Disruption Reporting */}
         {networkState && (
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-gray-300 uppercase tracking-wide">
+            <h3 className="text-xs font-medium text-rail-text-secondary uppercase tracking-wide">
               Event Reporting
             </h3>
             
             <button
               onClick={() => setIsDisruptionModalOpen(true)}
-              className="rail-button-secondary w-full flex items-center justify-center space-x-2 hover:bg-rail-warning/20 hover:border-rail-warning/30"
+              className="rail-button-secondary w-full flex items-center justify-center space-x-2 hover:bg-rail-warning/10 hover:border-rail-warning/50 hover:text-rail-warning"
             >
               <AlertTriangle className="w-4 h-4" />
               <span>Report Disruption</span>
@@ -173,20 +173,20 @@ const ControlPanel = ({
         {/* System Status */}
         {networkState && (
           <div className="space-y-3 mt-auto">
-            <h3 className="text-sm font-medium text-gray-300 uppercase tracking-wide">
+            <h3 className="text-xs font-medium text-rail-text-secondary uppercase tracking-wide">
               System Status
             </h3>
             
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-xs">
               <div className="flex justify-between">
-                <span className="text-gray-400">Active Trains:</span>
-                <span className="text-white font-medium">
+                <span className="text-rail-text-secondary">Active Trains:</span>
+                <span className="text-rail-text font-medium">
                   {networkState?.trains ? Object.keys(networkState.trains).length : 0}
                 </span>
               </div>
               
               <div className="flex justify-between">
-                <span className="text-gray-400">Network Health:</span>
+                <span className="text-rail-text-secondary">Network Health:</span>
                 <span className={`font-medium capitalize ${
                   networkState?.network_status?.network_health === 'healthy' 
                     ? 'text-rail-success' 
@@ -197,15 +197,15 @@ const ControlPanel = ({
               </div>
               
               <div className="flex justify-between">
-                <span className="text-gray-400">Operational Tracks:</span>
-                <span className="text-white font-medium">
+                <span className="text-rail-text-secondary">Operational Tracks:</span>
+                <span className="text-rail-text font-medium">
                   {networkState?.network_status?.operational_tracks || 0} / {networkState?.network_status?.total_tracks || 0}
                 </span>
               </div>
               
               {(networkState?.network_status?.failed_tracks || 0) > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Failed Tracks:</span>
+                  <span className="text-rail-text-secondary">Failed Tracks:</span>
                   <span className="text-rail-danger font-medium">
                     {networkState.network_status.failed_tracks}
                   </span>

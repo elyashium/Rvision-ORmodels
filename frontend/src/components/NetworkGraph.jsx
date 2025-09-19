@@ -25,22 +25,22 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
 
     const edges = new DataSet([
       // Main tracks
-      { id: 'NDLS_ANVR_MAIN', from: 'NDLS', to: 'ANVR', label: 'Main Line', color: { color: '#f9fafb' }, width: 3, title: 'NDLS-ANVR Main Line (25 min)' },
-      { id: 'ANVR_GZB_MAIN', from: 'ANVR', to: 'GZB', label: 'Main Line', color: { color: '#f9fafb' }, width: 3, title: 'ANVR-GZB Main Line (30 min)' },
-      { id: 'GZB_MUT_EXTENSION', from: 'GZB', to: 'MUT', label: 'Extension', color: { color: '#f9fafb' }, width: 3, title: 'GZB-MUT Extension (60 min)' },
+      { id: 'NDLS_ANVR_MAIN', from: 'NDLS', to: 'ANVR', label: 'Main Line', color: { color: '#495057' }, width: 2, title: 'NDLS-ANVR Main Line (25 min)' },
+      { id: 'ANVR_GZB_MAIN', from: 'ANVR', to: 'GZB', label: 'Main Line', color: { color: '#495057' }, width: 2, title: 'ANVR-GZB Main Line (30 min)' },
+      { id: 'GZB_MUT_EXTENSION', from: 'GZB', to: 'MUT', label: 'Extension', color: { color: '#495057' }, width: 2, title: 'GZB-MUT Extension (60 min)' },
       
       // Alternative routes
-      { id: 'NDLS_SBB_ALT', from: 'NDLS', to: 'SBB', label: 'Alt Route', color: { color: '#9ca3af' }, width: 2, dashes: [5, 5], title: 'NDLS-SBB Alternative (35 min)' },
-      { id: 'SBB_GZB_ALT', from: 'SBB', to: 'GZB', label: 'Alt Route', color: { color: '#9ca3af' }, width: 2, dashes: [5, 5], title: 'SBB-GZB Alternative (20 min)' },
+      { id: 'NDLS_SBB_ALT', from: 'NDLS', to: 'SBB', label: 'Alt Route', color: { color: '#6c757d' }, width: 1, dashes: [5, 5], title: 'NDLS-SBB Alternative (35 min)' },
+      { id: 'SBB_GZB_ALT', from: 'SBB', to: 'GZB', label: 'Alt Route', color: { color: '#6c757d' }, width: 1, dashes: [5, 5], title: 'SBB-GZB Alternative (20 min)' },
       
       // Bypass routes
-      { id: 'NDLS_VVB_BYPASS', from: 'NDLS', to: 'VVB', label: 'Bypass', color: { color: '#10b981' }, width: 1, dashes: [10, 5], title: 'NDLS-VVB Bypass (40 min)' },
-      { id: 'VVB_ANVR_BYPASS', from: 'VVB', to: 'ANVR', label: 'Bypass', color: { color: '#10b981' }, width: 1, dashes: [10, 5], title: 'VVB-ANVR Bypass (18 min)' },
+      { id: 'NDLS_VVB_BYPASS', from: 'NDLS', to: 'VVB', label: 'Bypass', color: { color: '#28a745' }, width: 1, dashes: [10, 5], title: 'NDLS-VVB Bypass (40 min)' },
+      { id: 'VVB_ANVR_BYPASS', from: 'VVB', to: 'ANVR', label: 'Bypass', color: { color: '#28a745' }, width: 1, dashes: [10, 5], title: 'VVB-ANVR Bypass (18 min)' },
       
       // Local connections
-      { id: 'NDLS_DLI_CONNECTOR', from: 'NDLS', to: 'DLI', label: 'Connector', color: { color: '#f59e0b' }, width: 2, title: 'NDLS-DLI Connector (8 min)' },
-      { id: 'DLI_SHZM_LOCAL', from: 'DLI', to: 'SHZM', label: 'Local', color: { color: '#f59e0b' }, width: 1, title: 'DLI-SHZM Local (15 min)' },
-      { id: 'SHZM_ANVR_LOCAL', from: 'SHZM', to: 'ANVR', label: 'Local', color: { color: '#f59e0b' }, width: 1, title: 'SHZM-ANVR Local (20 min)' },
+      { id: 'NDLS_DLI_CONNECTOR', from: 'NDLS', to: 'DLI', label: 'Connector', color: { color: '#ffc107' }, width: 1, title: 'NDLS-DLI Connector (8 min)' },
+      { id: 'DLI_SHZM_LOCAL', from: 'DLI', to: 'SHZM', label: 'Local', color: { color: '#ffc107' }, width: 1, title: 'DLI-SHZM Local (15 min)' },
+      { id: 'SHZM_ANVR_LOCAL', from: 'SHZM', to: 'ANVR', label: 'Local', color: { color: '#ffc107' }, width: 1, title: 'SHZM-ANVR Local (20 min)' },
     ]);
 
     return { nodes, edges };
@@ -102,23 +102,23 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
   const getNetworkOptions = () => ({
     nodes: {
       shape: 'dot',
-      size: 16,
+      size: 12,
       font: {
-        size: 12,
-        color: '#ffffff',
-        face: 'JetBrains Mono',
+        size: 10,
+        color: '#212529',
+        face: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       },
-      borderWidth: 2,
+      borderWidth: 1,
       shadow: {
         enabled: false, // Disable shadows for better performance
       },
     },
     edges: {
       font: {
-        size: 10,
-        color: '#ffffff',
-        strokeWidth: 2,
-        strokeColor: '#0a0f1c',
+        size: 8,
+        color: '#495057',
+        strokeWidth: 1,
+        strokeColor: '#ffffff',
       },
       smooth: {
         enabled: false, // Disable smooth edges for better performance
@@ -129,44 +129,44 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
     },
     groups: {
       major_junction: {
-        color: { background: '#f9fafb', border: '#d1d5db' },
-        size: 25,
+        color: { background: '#212529', border: '#495057' },
+        size: 18,
         shape: 'diamond',
       },
       terminal: {
-        color: { background: '#e5e7eb', border: '#9ca3af' },
-        size: 20,
+        color: { background: '#6c757d', border: '#495057' },
+        size: 15,
         shape: 'square',
       },
       junction: {
-        color: { background: '#10b981', border: '#059669' },
-        size: 18,
+        color: { background: '#28a745', border: '#198754' },
+        size: 14,
         shape: 'triangle',
       },
       intermediate: {
-        color: { background: '#f59e0b', border: '#d97706' },
-        size: 15,
-        shape: 'circle',
-      },
-      small: {
-        color: { background: '#9ca3af', border: '#6b7280' },
+        color: { background: '#ffc107', border: '#e0a800' },
         size: 12,
         shape: 'circle',
       },
+      small: {
+        color: { background: '#dee2e6', border: '#6c757d' },
+        size: 10,
+        shape: 'circle',
+      },
       destination: {
-        color: { background: '#d1d5db', border: '#9ca3af' },
-        size: 22,
+        color: { background: '#6c757d', border: '#495057' },
+        size: 16,
         shape: 'star',
       },
       train: {
         color: { 
-          background: '#ef4444', 
-          border: '#dc2626',
-          highlight: { background: '#f87171', border: '#ef4444' },
+          background: '#dc3545', 
+          border: '#b02a37',
+          highlight: { background: '#e35d6a', border: '#dc3545' },
         },
-        size: 12,
+        size: 10,
         shape: 'triangle',
-        font: { size: 10, color: '#ffffff' },
+        font: { size: 8, color: '#ffffff' },
       },
     },
     physics: {
@@ -323,38 +323,38 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
   return (
     <div className={`relative ${isFullscreen ? 'fixed inset-0 z-40 bg-rail-darker' : 'h-full max-h-full overflow-hidden'}`}>
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-rail-blue/20">
-        <h3 className="text-sm font-semibold text-white">Railway Network Visualization</h3>
+      <div className="flex items-center justify-between p-2 border-b border-rail-gray">
+        <h3 className="text-xs font-semibold text-rail-text">Railway Network Visualization</h3>
         
         {/* Controls */}
         <div className="flex items-center space-x-1">
           <button
             onClick={handleZoomIn}
-            className="p-1.5 hover:bg-rail-blue/20 rounded transition-colors"
+            className="p-1 hover:bg-rail-gray rounded transition-colors"
             title="Zoom In"
           >
-            <ZoomIn className="w-3.5 h-3.5" />
+            <ZoomIn className="w-3 h-3 text-rail-text" />
           </button>
           <button
             onClick={handleZoomOut}
-            className="p-1.5 hover:bg-rail-blue/20 rounded transition-colors"
+            className="p-1 hover:bg-rail-gray rounded transition-colors"
             title="Zoom Out"
           >
-            <ZoomOut className="w-3.5 h-3.5" />
+            <ZoomOut className="w-3 h-3 text-rail-text" />
           </button>
           <button
             onClick={handleReset}
-            className="p-1.5 hover:bg-rail-blue/20 rounded transition-colors"
+            className="p-1 hover:bg-rail-gray rounded transition-colors"
             title="Reset View"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3 h-3 text-rail-text" />
           </button>
           <button
             onClick={toggleFullscreen}
-            className="p-1.5 hover:bg-rail-blue/20 rounded transition-colors"
+            className="p-1 hover:bg-rail-gray rounded transition-colors"
             title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
           >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            {isFullscreen ? <Minimize2 className="w-3 h-3 text-rail-text" /> : <Maximize2 className="w-3 h-3 text-rail-text" />}
           </button>
         </div>
       </div>
@@ -362,10 +362,10 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
       {/* Network Container */}
       <div 
         ref={networkContainer} 
-        className={`bg-rail-darker ${isFullscreen ? 'h-[calc(100vh-80px)]' : 'h-[calc(100%-50px)]'}`}
+        className={`bg-white ${isFullscreen ? 'h-[calc(100vh-80px)]' : 'h-[calc(100%-40px)]'}`}
         style={{ 
           width: '100%',
-          maxHeight: isFullscreen ? 'calc(100vh - 80px)' : 'calc(100% - 50px)',
+          maxHeight: isFullscreen ? 'calc(100vh - 80px)' : 'calc(100% - 40px)',
           position: 'relative',
           overflow: 'hidden'
         }}
@@ -373,8 +373,8 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
 
       {/* Legend */}
       <div className="absolute bottom-2 left-2 rail-card p-2 max-w-xs">
-        <h4 className="text-xs font-semibold mb-1">Legend</h4>
-        <div className="grid grid-cols-2 gap-1 text-xs">
+        <h4 className="text-xs font-semibold mb-1 text-rail-text">Legend</h4>
+        <div className="grid grid-cols-2 gap-1 text-xs text-rail-text">
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-rail-light-blue rounded-full"></div>
             <span>Major Junction</span>
@@ -407,13 +407,13 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
         <div className="absolute top-16 right-2 rail-card p-2">
           <div className="text-xs space-y-1">
             <div className="flex justify-between">
-              <span className="text-gray-400">Active Trains:</span>
-              <span className="text-white font-medium">
+              <span className="text-rail-blue">Active Trains:</span>
+              <span className="text-rail-accent font-medium">
                 {Object.keys(networkState.trains || {}).length}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Simulation:</span>
+              <span className="text-rail-blue">Simulation:</span>
               <span className={`font-medium ${isSimulationRunning ? 'text-rail-success' : 'text-rail-gray'}`}>
                 {isSimulationRunning ? 'Running' : 'Paused'}
               </span>

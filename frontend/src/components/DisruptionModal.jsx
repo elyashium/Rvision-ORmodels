@@ -25,7 +25,7 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
   };
 
   const validateForm = () => {
-    if (!formData.train_id) {
+    if (!formData.train_id || formData.train_id === '') {
       return 'Please select a train';
     }
     if (!formData.delay_minutes || formData.delay_minutes <= 0) {
@@ -33,6 +33,9 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
     }
     if (formData.delay_minutes > 480) { // 8 hours max
       return 'Delay cannot exceed 8 hours (480 minutes)';
+    }
+    if (trainOptions.length === 0) {
+      return 'No trains available. Please load schedule first.';
     }
     return null;
   };
@@ -53,6 +56,8 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
       const submissionData = {
         ...formData,
         delay_minutes: parseInt(formData.delay_minutes),
+        // Map all event types to 'delay' since they all affect individual trains
+        event_type: 'delay'
       };
 
       await onSubmit(submissionData);
@@ -66,8 +71,7 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
         description: '',
       });
     } catch (error) {
-      setError('Failed to report disruption. Please try again.');
-      console.error('Disruption submission error:', error);
+      setError(`Failed to report disruption: ${error.response?.data?.error || error.message || 'Please try again.'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -98,12 +102,12 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
         <div className="flex items-center justify-between p-6 pb-4 border-b border-rail-blue/20">
           <div className="flex items-center space-x-3">
             <AlertTriangle className="w-6 h-6 text-rail-warning" />
-            <h2 className="text-xl font-semibold">Report Disruption</h2>
+            <h2 className="text-xl font-semibold text-rail-text">Report Disruption</h2>
           </div>
           <button
             onClick={handleClose}
             disabled={isSubmitting}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-rail-text-secondary hover:text-rail-text transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -113,7 +117,7 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Train Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-rail-text mb-2">
               <Train className="w-4 h-4 inline mr-2" />
               Affected Train
             </label>
@@ -123,7 +127,9 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
               className="rail-select w-full"
               disabled={isSubmitting}
             >
-              <option value="">Select a train...</option>
+              <option value="">
+                {trainOptions.length > 0 ? 'Select a train...' : 'No trains available - Load schedule first'}
+              </option>
               {trainOptions.map(train => (
                 <option key={train.value} value={train.value}>
                   {train.label}
@@ -131,7 +137,7 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
               ))}
             </select>
             {selectedTrain && (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-rail-text-secondary mt-1">
                 Route: {selectedTrain.section}
               </p>
             )}
@@ -139,7 +145,7 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
 
           {/* Event Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-rail-text mb-2">
               Event Type
             </label>
             <select
@@ -158,7 +164,7 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
 
           {/* Delay Duration */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-rail-text mb-2">
               <Clock className="w-4 h-4 inline mr-2" />
               Delay Duration (minutes)
             </label>
@@ -176,7 +182,7 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
 
           {/* Location (Optional) */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-rail-text mb-2">
               <MapPin className="w-4 h-4 inline mr-2" />
               Location (Optional)
             </label>
@@ -197,7 +203,7 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-rail-text mb-2">
               Additional Details (Optional)
             </label>
             <textarea
@@ -239,7 +245,7 @@ const DisruptionModal = ({ isOpen, onClose, onSubmit, trainOptions, stationOptio
         {/* Info Footer */}
         <div className="px-6 pb-6">
           <div className="bg-rail-blue/10 border border-rail-blue/20 rounded-lg p-3">
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-rail-text-secondary">
               <strong className="text-rail-accent">Note:</strong> Reporting a disruption will trigger 
               R-Vision's optimization engine to analyze the impact and provide recommendations 
               for minimizing delays across the network.

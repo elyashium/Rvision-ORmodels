@@ -2,7 +2,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from models import RailwayNetwork
-from optimizer import Optimizer, PRIORITY_WEIGHTS, ACTION_PENALTIES
+from optimizer import Optimizer, MultiStrategyOptimizer, PRIORITY_WEIGHTS, ACTION_PENALTIES
 import json
 import os
 from typing import Dict, Any
@@ -14,18 +14,22 @@ CORS(app)  # Enable CORS for frontend integration
 # Global variables to hold our system components
 network: RailwayNetwork = None
 optimizer: Optimizer = None
+multi_strategy_optimizer: MultiStrategyOptimizer = None
 initial_schedule_data = None
 
 def initialize_system():
     """Initialize the railway network and optimizer from schedule data."""
-    global network, optimizer, initial_schedule_data
+    global network, optimizer, multi_strategy_optimizer, initial_schedule_data
     
     try:
-        # Load the initial schedule from file
-        schedule_file = 'schedule.json'
+        # Load the initial schedule from file (try enhanced first, fallback to basic)
+        schedule_file = 'enhanced_schedule.json'
         if not os.path.exists(schedule_file):
-            print(f"⚠️  Warning: {schedule_file} not found. Creating sample data...")
-            create_sample_schedule()
+            print(f"⚠️  Warning: {schedule_file} not found. Trying basic schedule...")
+            schedule_file = 'schedule.json'
+            if not os.path.exists(schedule_file):
+                print(f"⚠️  Warning: No schedule files found. Creating sample data...")
+                create_sample_schedule()
         
         with open(schedule_file, 'r') as f:
             initial_schedule_data = json.load(f)
@@ -33,10 +37,12 @@ def initialize_system():
         # Create our "World" (Digital Twin) and "Brain" (Optimizer)
         network = RailwayNetwork(initial_schedule_data)
         optimizer = Optimizer(PRIORITY_WEIGHTS, ACTION_PENALTIES)
+        multi_strategy_optimizer = MultiStrategyOptimizer(PRIORITY_WEIGHTS, ACTION_PENALTIES)
         
         print("🚂 R-Vision System Initialized Successfully!")
         print(f"   📊 Loaded {len(network.trains)} trains")
-        print(f"   🧠 Optimizer ready with {len(PRIORITY_WEIGHTS)} priority levels")
+        print(f"   🧠 Standard Optimizer ready with {len(PRIORITY_WEIGHTS)} priority levels")
+        print(f"   🎯 Multi-Strategy Optimizer ready with 3 strategies")
         
     except Exception as e:
         print(f"❌ Error initializing system: {e}")
@@ -103,7 +109,7 @@ def get_current_state():
 @app.route('/api/report-event', methods=['POST'])
 def report_event():
     """
-    Main endpoint: Report a disruption event and get AI recommendations.
+    Main endpoint: Report a disruption event and get multi-strategy AI recommendations.
     
     Expected JSON payload:
     {
@@ -114,7 +120,7 @@ def report_event():
     }
     """
     try:
-        if not network or not optimizer:
+        if not network or not multi_strategy_optimizer:
             return jsonify({"error": "System not initialized"}), 500
         
         # Get event data from request
@@ -139,19 +145,19 @@ def report_event():
                 "error": f"Failed to apply event to train {event_data.get('train_id')}"
             }), 400
         
-        # Step 2: Run the optimizer on the new state of the world
-        optimization_result = optimizer.run(network)
+        # Step 2: Run multi-strategy optimization
+        multi_strategy_results = multi_strategy_optimizer.run_all_strategies(network)
         
         # Step 3: Format the response
         response = {
             "status": "success",
             "event_processed": event_data,
             "network_state": network.get_state_snapshot(),
-            "optimization_result": optimization_result,
+            "simulations": multi_strategy_results,
             "timestamp": network.get_state_snapshot()["timestamp"]
         }
         
-        print(f"✅ EVENT PROCESSED: {optimization_result.get('status', 'Unknown')}")
+        print(f"✅ MULTI-STRATEGY ANALYSIS COMPLETED: {len(multi_strategy_results)} strategies evaluated")
         
         return jsonify(response)
     

@@ -11,13 +11,21 @@ class Train:
         self.id: str = train_data['Train_ID']
         self.train_type: str = train_data.get('Train_Type', 'Express')  # Express, Goods, Local
         
-        # Journey details
-        self.section_start: str = train_data['Section_Start']
-        self.section_end: str = train_data['Section_End']
-        
-        # Schedule information
-        self.scheduled_departure_time: str = train_data['Scheduled_Departure_Time']
-        self.scheduled_arrival_time: str = train_data['Scheduled_Arrival_Time']
+        # Journey details - handle both old and new formats
+        if 'Route' in train_data and train_data['Route']:
+            # New enhanced format with Route array
+            route = train_data['Route']
+            self.section_start: str = route[0]['Station_ID']
+            self.section_end: str = route[-1]['Station_ID']
+            # Use first departure and last arrival for schedule times
+            self.scheduled_departure_time: str = route[0]['Departure_Time']
+            self.scheduled_arrival_time: str = route[-1]['Arrival_Time']
+        else:
+            # Old format
+            self.section_start: str = train_data['Section_Start']
+            self.section_end: str = train_data['Section_End']
+            self.scheduled_departure_time: str = train_data['Scheduled_Departure_Time']
+            self.scheduled_arrival_time: str = train_data['Scheduled_Arrival_Time']
         self.day_of_week: str = train_data.get('Day_of_Week', 'Monday')
         self.time_of_day: str = train_data.get('Time_of_Day', 'Morning_Peak')
         

@@ -3,6 +3,7 @@ import { Train, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
 import ControlPanel from './components/ControlPanel';
 import NetworkGraph from './components/NetworkGraph';
 import AlertsAndRecommendations from './components/AlertsAndRecommendations';
+import MultiStrategySimulation from './components/MultiStrategySimulation';
 import SimulationClock from './components/SimulationClock';
 import { apiService } from './services/apiService';
 import { useTrainSimulation } from './hooks/useTrainSimulation';
@@ -13,6 +14,8 @@ function App() {
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [alerts, setAlerts] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
+  const [multiStrategySimulations, setMultiStrategySimulations] = useState(null);
+  const [isImplementingStrategy, setIsImplementingStrategy] = useState(false);
   const [systemHealth, setSystemHealth] = useState('healthy');
   const [isNetworkFullscreen, setIsNetworkFullscreen] = useState(false);
 
@@ -122,15 +125,53 @@ function App() {
     addAlert('info', 'Simulation stopped', 'Real-time monitoring paused');
   };
 
-  const handleDisruptionReported = (eventData, optimizationResult) => {
+  const handleDisruptionReported = (eventData, optimizationResult, simulations) => {
+    console.log('App: handleDisruptionReported called with:', { eventData, optimizationResult, simulations });
+    
     addAlert('warning', `Disruption reported: ${eventData.train_id}`, `${eventData.delay_minutes} minute delay`);
     
-    if (optimizationResult && optimizationResult.recommendation) {
+    // Handle multi-strategy simulations
+    if (simulations && Object.keys(simulations).length > 0) {
+      console.log('App: Setting multi-strategy simulations:', simulations);
+      setMultiStrategySimulations(simulations);
+      addAlert('info', 'Multi-strategy analysis completed', `${Object.keys(simulations).length} optimization strategies evaluated`);
+    } 
+    // Fallback to legacy single recommendation
+    else if (optimizationResult && optimizationResult.recommendation) {
+      console.log('App: Using legacy single recommendation:', optimizationResult);
       addRecommendation({
         id: Date.now(),
         ...optimizationResult,
         timestamp: new Date().toISOString(),
       });
+    } else {
+      console.warn('App: No simulations or optimization result received');
+    }
+  };
+
+  const handleImplementStrategy = async (strategyData) => {
+    setIsImplementingStrategy(true);
+    
+    try {
+      // Call the accept-recommendation API endpoint
+      const response = await apiService.acceptRecommendation(strategyData.recommendation);
+      
+      if (response.data.status === 'success') {
+        addAlert('success', `${strategyData.strategyName} strategy implemented`, 
+          strategyData.recommendation.recommendation_text);
+        
+        // Clear the multi-strategy simulations after implementation
+        setMultiStrategySimulations(null);
+        
+        // Refresh network state
+        const stateResponse = await apiService.getCurrentState();
+        setNetworkState(stateResponse.data);
+      }
+    } catch (error) {
+      console.error('Failed to implement strategy:', error);
+      addAlert('error', 'Failed to implement strategy', error.message);
+    } finally {
+      setIsImplementingStrategy(false);
     }
   };
 
@@ -233,16 +274,24 @@ function App() {
                   />
                 }
                 rightPanelContent={
-                  <AlertsAndRecommendations
-                    alerts={alerts}
-                    recommendations={recommendations}
-                    onAcceptRecommendation={(recommendation) => {
-                      addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
-                    }}
-                    onRejectRecommendation={(recommendation) => {
-                      addAlert('info', 'Recommendation rejected', 'Manual override applied');
-                    }}
-                  />
+                  multiStrategySimulations ? (
+                    <MultiStrategySimulation
+                      simulations={multiStrategySimulations}
+                      onImplementStrategy={handleImplementStrategy}
+                      isImplementing={isImplementingStrategy}
+                    />
+                  ) : (
+                    <AlertsAndRecommendations
+                      alerts={alerts}
+                      recommendations={recommendations}
+                      onAcceptRecommendation={(recommendation) => {
+                        addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
+                      }}
+                      onRejectRecommendation={(recommendation) => {
+                        addAlert('info', 'Recommendation rejected', 'Manual override applied');
+                      }}
+                    />
+                  )
                 }
               />
             </div>
@@ -262,18 +311,26 @@ function App() {
                 />
               )}
               
-              {/* Alerts and Recommendations */}
+              {/* Multi-Strategy Simulation or Alerts and Recommendations */}
               <div className="flex-1 min-h-0">
-                <AlertsAndRecommendations
-                  alerts={alerts}
-                  recommendations={recommendations}
-                  onAcceptRecommendation={(recommendation) => {
-                    addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
-                  }}
-                  onRejectRecommendation={(recommendation) => {
-                    addAlert('info', 'Recommendation rejected', 'Manual override applied');
-                  }}
-                />
+                {multiStrategySimulations ? (
+                  <MultiStrategySimulation
+                    simulations={multiStrategySimulations}
+                    onImplementStrategy={handleImplementStrategy}
+                    isImplementing={isImplementingStrategy}
+                  />
+                ) : (
+                  <AlertsAndRecommendations
+                    alerts={alerts}
+                    recommendations={recommendations}
+                    onAcceptRecommendation={(recommendation) => {
+                      addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
+                    }}
+                    onRejectRecommendation={(recommendation) => {
+                      addAlert('info', 'Recommendation rejected', 'Manual override applied');
+                    }}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -320,16 +377,24 @@ function App() {
                   />
                 )}
                 
-                <AlertsAndRecommendations
-                  alerts={alerts}
-                  recommendations={recommendations}
-                  onAcceptRecommendation={(recommendation) => {
-                    addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
-                  }}
-                  onRejectRecommendation={(recommendation) => {
-                    addAlert('info', 'Recommendation rejected', 'Manual override applied');
-                  }}
-                />
+                {multiStrategySimulations ? (
+                  <MultiStrategySimulation
+                    simulations={multiStrategySimulations}
+                    onImplementStrategy={handleImplementStrategy}
+                    isImplementing={isImplementingStrategy}
+                  />
+                ) : (
+                  <AlertsAndRecommendations
+                    alerts={alerts}
+                    recommendations={recommendations}
+                    onAcceptRecommendation={(recommendation) => {
+                      addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
+                    }}
+                    onRejectRecommendation={(recommendation) => {
+                      addAlert('info', 'Recommendation rejected', 'Manual override applied');
+                    }}
+                  />
+                )}
               </div>
             }
           />

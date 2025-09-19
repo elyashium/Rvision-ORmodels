@@ -68,36 +68,75 @@ const ControlPanel = ({
       if (response.data.status === 'success') {
         onDisruptionReported(
           response.data.event_processed, 
-          response.data.optimization_result
+          response.data.optimization_result,
+          response.data.simulations
         );
         setIsDisruptionModalOpen(false);
       }
     } catch (error) {
       console.error('Failed to report disruption:', error);
-      // The modal will handle displaying the error
+      throw error; // Re-throw so the modal can display the error
     }
   };
 
   const getTrainOptions = () => {
-    if (!networkState?.trains) return [];
+    // Handle both networkState trains and simulationTrains
+    let trains = [];
     
-    return Object.values(networkState.trains).map(train => ({
-      value: train.train_id,
-      label: `${train.train_id} (${train.train_type})`,
-      section: `${train.section_start} → ${train.section_end}`,
-    }));
+    if (simulationTrains && simulationTrains.length > 0) {
+      // Use live simulation trains
+      trains = simulationTrains.map(train => {
+        const originStation = train.route?.[0]?.Station_Name || train.route?.[0]?.Station_ID || 'Unknown';
+        const destStation = train.route?.[train.route?.length - 1]?.Station_Name || train.route?.[train.route?.length - 1]?.Station_ID || 'Unknown';
+        
+        return {
+          value: train.Train_ID || train.train_id,
+          label: `${train.Train_ID || train.train_id} (${train.Train_Type || train.type || 'Unknown'})`,
+          section: `${originStation} → ${destStation}`,
+        };
+      });
+    } else if (networkState?.trains) {
+      // Use legacy networkState trains
+      trains = Object.values(networkState.trains).map(train => ({
+        value: train.train_id,
+        label: `${train.train_id} (${train.train_type})`,
+        section: `${train.section_start} → ${train.section_end}`,
+      }));
+    }
+    
+    return trains;
   };
 
   const getStationOptions = () => {
-    if (!networkState?.trains) return [];
-    
     const stations = new Set();
-    Object.values(networkState.trains).forEach(train => {
-      stations.add(train.section_start);
-      stations.add(train.section_end);
-    });
     
-    return Array.from(stations).map(station => ({
+    // Handle both simulation trains and network state trains
+    if (simulationTrains && simulationTrains.length > 0) {
+      simulationTrains.forEach(train => {
+        if (train.route) {
+          train.route.forEach(stop => {
+            const stationName = stop.Station_Name || stop.Station_ID || stop.station;
+            if (stationName) {
+              stations.add(stationName);
+            }
+          });
+        }
+      });
+    } else if (networkState?.trains) {
+      Object.values(networkState.trains).forEach(train => {
+        if (train.section_start) stations.add(train.section_start);
+        if (train.section_end) stations.add(train.section_end);
+      });
+    }
+    
+    // Add some default stations if none found
+    if (stations.size === 0) {
+      ['New Delhi', 'Anand Vihar', 'Ghaziabad', 'Aligarh', 'Kanpur'].forEach(station => {
+        stations.add(station);
+      });
+    }
+    
+    return Array.from(stations).sort().map(station => ({
       value: station,
       label: station.replace(/_/g, ' '),
     }));

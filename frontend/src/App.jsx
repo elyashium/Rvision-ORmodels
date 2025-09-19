@@ -175,6 +175,51 @@ function App() {
     }
   };
 
+  const handleRunSimulation = async (strategyData) => {
+    try {
+      addAlert('info', `Running ${strategyData.strategyName} simulation`, 
+        'Visualizing strategy outcomes on the network map...');
+      
+      // If there's a recommendation, apply it temporarily to see its effects
+      if (strategyData.recommendation && Object.keys(strategyData.recommendation).length > 0) {
+        const response = await apiService.acceptRecommendation(strategyData.recommendation);
+        
+        if (response.data.status === 'success') {
+          // Get updated network state to visualize the simulation
+          const stateResponse = await apiService.getCurrentState();
+          setNetworkState(stateResponse.data);
+          
+          // Start the live simulation to show the strategy in action
+          if (stateResponse.data.trains && stateResponse.data.trains.length > 0) {
+            setSimulationTrains(stateResponse.data.trains);
+            handleSimulationStart();
+            
+            addAlert('success', `${strategyData.strategyName} simulation started`, 
+              'Watch the network visualization to see the strategy in action');
+          }
+        }
+      } else {
+        // For strategies without recommendations (like NoConflict), just start the current simulation
+        const stateResponse = await apiService.getCurrentState();
+        setNetworkState(stateResponse.data);
+        
+        if (stateResponse.data.trains && stateResponse.data.trains.length > 0) {
+          setSimulationTrains(stateResponse.data.trains);
+          handleSimulationStart();
+          
+          addAlert('success', `${strategyData.strategyName} baseline simulation started`, 
+            'Showing current network state - no optimization changes needed');
+        } else {
+          addAlert('info', 'No active trains for simulation', 
+            'Add some trains to the network to run simulations');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to run simulation:', error);
+      addAlert('error', 'Failed to run simulation', error.message);
+    }
+  };
+
   const getHealthStatusIcon = () => {
     switch (systemHealth) {
       case 'healthy':
@@ -317,6 +362,7 @@ function App() {
                   <MultiStrategySimulation
                     simulations={multiStrategySimulations}
                     onImplementStrategy={handleImplementStrategy}
+                    onRunSimulation={handleRunSimulation}
                     isImplementing={isImplementingStrategy}
                   />
                 ) : (
@@ -381,6 +427,7 @@ function App() {
                   <MultiStrategySimulation
                     simulations={multiStrategySimulations}
                     onImplementStrategy={handleImplementStrategy}
+                    onRunSimulation={handleRunSimulation}
                     isImplementing={isImplementingStrategy}
                   />
                 ) : (

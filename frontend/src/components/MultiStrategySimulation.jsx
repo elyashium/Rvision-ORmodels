@@ -18,6 +18,7 @@ import {
 const MultiStrategySimulation = ({ 
   simulations, 
   onImplementStrategy,
+  onRunSimulation,
   isImplementing = false 
 }) => {
   const [expandedStrategy, setExpandedStrategy] = useState(null);
@@ -32,7 +33,7 @@ const MultiStrategySimulation = ({
             Multi-Strategy Analysis
           </h3>
           <p className="text-rail-text-secondary">
-            Report a disruption to see comparative optimization strategies
+            Report a disruption to see optimization strategies
           </p>
         </div>
       </div>
@@ -108,22 +109,10 @@ const MultiStrategySimulation = ({
   };
 
   return (
-    <div className="rail-card">
-      <div className="p-4 border-b border-rail-gray">
-        <div className="flex items-center space-x-3">
-          <Brain className="w-6 h-6 text-rail-info" />
-          <div>
-            <h3 className="text-lg font-semibold text-rail-text">
-              Multi-Strategy AI Analysis
-            </h3>
-            <p className="text-sm text-rail-text-secondary">
-              Compare different optimization approaches for the current disruption
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="rail-card flex flex-col h-full">
 
-      <div className="p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-2 space-y-3">
         {Object.entries(simulations).map(([strategyKey, strategy]) => (
           <div
             key={strategyKey}
@@ -132,7 +121,7 @@ const MultiStrategySimulation = ({
             }`}
           >
             {/* Strategy Header */}
-            <div className="p-4">
+            <div className="p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   {getStrategyIcon(strategyKey)}
@@ -189,40 +178,44 @@ const MultiStrategySimulation = ({
 
             {/* Expanded Details */}
             {expandedStrategy === strategyKey && (
-              <div className="border-t bg-white/50 p-4 space-y-4">
-                {strategy.status === 'ConflictFound' && strategy.benefits_drawbacks && (
+              <div className="border-t bg-white/50 p-3 space-y-3">
+                {strategy.benefits_drawbacks && (strategy.benefits_drawbacks.benefits.length > 0 || strategy.benefits_drawbacks.drawbacks.length > 0) && (
                   <div className="grid md:grid-cols-2 gap-4">
                     {/* Benefits */}
-                    <div className="space-y-2">
-                      <h5 className="font-medium text-green-700 flex items-center space-x-2">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Benefits</span>
-                      </h5>
-                      <ul className="space-y-1">
-                        {strategy.benefits_drawbacks.benefits.map((benefit, index) => (
-                          <li key={index} className="text-sm text-rail-text-secondary flex items-start space-x-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-2 flex-shrink-0" />
-                            <span>{benefit}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    {strategy.benefits_drawbacks.benefits && strategy.benefits_drawbacks.benefits.length > 0 && (
+                      <div className="space-y-2">
+                        <h5 className="font-medium text-green-700 flex items-center space-x-2">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Throughput Benefits</span>
+                        </h5>
+                        <ul className="space-y-1">
+                          {strategy.benefits_drawbacks.benefits.map((benefit, index) => (
+                            <li key={index} className="text-sm text-rail-text-secondary flex items-start space-x-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-2 flex-shrink-0" />
+                              <span>{benefit}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     {/* Drawbacks */}
-                    <div className="space-y-2">
-                      <h5 className="font-medium text-red-700 flex items-center space-x-2">
-                        <XCircle className="w-4 h-4" />
-                        <span>Drawbacks</span>
-                      </h5>
-                      <ul className="space-y-1">
-                        {strategy.benefits_drawbacks.drawbacks.map((drawback, index) => (
-                          <li key={index} className="text-sm text-rail-text-secondary flex items-start space-x-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-2 flex-shrink-0" />
-                            <span>{drawback}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    {strategy.benefits_drawbacks.drawbacks && strategy.benefits_drawbacks.drawbacks.length > 0 && (
+                      <div className="space-y-2">
+                        <h5 className="font-medium text-red-700 flex items-center space-x-2">
+                          <XCircle className="w-4 h-4" />
+                          <span>Operational Trade-offs</span>
+                        </h5>
+                        <ul className="space-y-1">
+                          {strategy.benefits_drawbacks.drawbacks.map((drawback, index) => (
+                            <li key={index} className="text-sm text-rail-text-secondary flex items-start space-x-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-2 flex-shrink-0" />
+                              <span>{drawback}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -265,9 +258,23 @@ const MultiStrategySimulation = ({
                   </div>
                 )}
 
-                {/* Implement Button */}
-                {strategy.status === 'ConflictFound' && strategy.recommendation && (
-                  <div className="pt-2">
+                {/* Action Buttons */}
+                <div className="pt-2 space-y-2">
+                  {/* Run Simulation Button - Always available */}
+                  <button
+                    onClick={() => onRunSimulation && onRunSimulation({
+                      strategy: strategyKey,
+                      recommendation: strategy.recommendation || {},
+                      strategyName: strategy.strategy_name || strategyKey.charAt(0).toUpperCase() + strategyKey.slice(1)
+                    })}
+                    className="w-full rail-button-secondary flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Play className="w-4 h-4" />
+                    <span>Run {strategy.strategy_name || strategyKey.charAt(0).toUpperCase() + strategyKey.slice(1)} Simulation</span>
+                  </button>
+
+                  {/* Implement Button - Only for strategies with recommendations */}
+                  {strategy.status === 'ConflictFound' && strategy.recommendation && (
                     <button
                       onClick={() => handleImplementStrategy(strategyKey, strategy)}
                       disabled={isImplementing}
@@ -275,33 +282,33 @@ const MultiStrategySimulation = ({
                         selectedStrategy === strategyKey ? 'bg-blue-600 hover:bg-blue-700' : ''
                       } ${isImplementing ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      <Play className="w-4 h-4" />
+                      <Target className="w-4 h-4" />
                       <span>
                         {isImplementing && selectedStrategy === strategyKey 
                           ? 'Implementing...' 
-                          : `Implement ${strategy.strategy_name}`
+                          : `Implement ${strategy.strategy_name || strategyKey.charAt(0).toUpperCase() + strategyKey.slice(1)}`
                         }
                       </span>
                     </button>
-                  </div>
-                )}
+                  )}
+                  
+                  {/* No Conflicts Message */}
+                  {strategy.status === 'NoConflict' && (
+                    <div className="w-full p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+                      <div className="flex items-center justify-center space-x-2 text-green-700">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span className="text-sm font-medium">No optimization needed - strategy already optimal</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
         ))}
-      </div>
-
-      {/* Summary Footer */}
-      <div className="border-t border-rail-gray p-4 bg-rail-light-gray/30">
-        <div className="flex justify-between items-center text-sm">
-          <span className="text-rail-text-secondary">
-            {Object.keys(simulations).length} strategies analyzed
-          </span>
-          <span className="text-rail-text-secondary">
-            Select a strategy to implement the recommended solution
-          </span>
         </div>
       </div>
+
     </div>
   );
 };

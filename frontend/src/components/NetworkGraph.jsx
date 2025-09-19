@@ -101,6 +101,133 @@ const NetworkGraph = ({
     return { nodes, edges };
   };
 
+  // Helper function to get edge geometry from vis-network
+  const getVisualEdgeGeometry = (fromStationId, toStationId) => {
+    if (!networkInstance.current?.body?.edges) return null;
+    
+    try {
+      // Get the vis-network body for accessing edge geometry
+      const network = networkInstance.current;
+      
+      // Try different edge ID patterns to find the correct edge
+      const possibleEdgeIds = [
+        `${fromStationId}_${toStationId}_MAIN`,
+        `${toStationId}_${fromStationId}_MAIN`,
+        `${fromStationId}_${toStationId}_ALT`,
+        `${toStationId}_${fromStationId}_ALT`,
+        `${fromStationId}_${toStationId}`,
+        `${toStationId}_${fromStationId}`
+      ];
+      
+      let targetEdgeId = null;
+      let edgeObject = null;
+      
+      // First try to find edge by ID pattern
+      for (const edgeId of possibleEdgeIds) {
+        if (network.body.edges[edgeId]) {
+          targetEdgeId = edgeId;
+          edgeObject = network.body.edges[edgeId];
+          break;
+        }
+      }
+      
+      // If not found, search through all edges
+      if (!edgeObject) {
+        for (const [edgeId, edge] of Object.entries(network.body.edges)) {
+          const edgeData = network.body.data.edges.get(edgeId);
+          if (edgeData && 
+              ((edgeData.from === fromStationId && edgeData.to === toStationId) ||
+               (edgeData.from === toStationId && edgeData.to === fromStationId))) {
+            targetEdgeId = edgeId;
+            edgeObject = edge;
+            break;
+          }
+        }
+      }
+      
+      if (!edgeObject) {
+        console.warn(`No edge found between ${fromStationId} and ${toStationId}`);
+        return null;
+      }
+      
+      // Get the connected nodes
+      const fromNode = network.body.nodes[edgeObject.fromId];
+      const toNode = network.body.nodes[edgeObject.toId];
+      
+      if (!fromNode || !toNode) {
+        console.warn(`Missing nodes for edge ${targetEdgeId}`);
+        return null;
+      }
+      
+      // Determine correct direction based on station IDs
+      const isForward = edgeObject.fromId === fromStationId;
+      
+      return {
+        from: { x: fromNode.x, y: fromNode.y },
+        to: { x: toNode.x, y: toNode.y },
+        edgeId: targetEdgeId,
+        isForward
+      };
+    } catch (error) {
+      console.warn('Error getting edge geometry:', error);
+      return null;
+    }
+  };
+
+  // Function to get station position from vis-network
+  const getStationVisualPosition = (stationId) => {
+    if (!networkInstance.current) return null;
+    
+    try {
+      const network = networkInstance.current;
+      const node = network.body.nodes[stationId];
+      
+      if (node) {
+        return { x: node.x, y: node.y };
+      }
+    } catch (error) {
+      console.warn('Error getting station position:', error);
+    }
+    
+    return null;
+  };
+
+  // Function to interpolate along visual edge
+  const interpolateAlongVisualEdge = (train) => {
+    // If train is at a station (not moving), get station position
+    if (train.isAtStation && train.currentStop) {
+      const stationPos = getStationVisualPosition(train.currentStop.Station_ID);
+      if (stationPos) {
+        return stationPos;
+      }
+    }
+    
+    // If train is moving between stations
+    if (train.currentStop && train.nextStop && train.progressPercentage !== undefined) {
+      const edgeGeometry = getVisualEdgeGeometry(train.currentStop.Station_ID, train.nextStop.Station_ID);
+      
+      if (edgeGeometry) {
+        // Interpolate along the actual visual edge
+        const progress = train.progressPercentage;
+        const x = edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * progress;
+        const y = edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * progress;
+        
+        return { x, y };
+      }
+    }
+    
+    // Fallback: try to get current station position
+    if (train.currentStop) {
+      const stationPos = getStationVisualPosition(train.currentStop.Station_ID);
+      if (stationPos) {
+        return stationPos;
+      }
+    }
+    
+    // Ultimate fallback to simulation-calculated position
+    return train.currentPosition || { x: 0, y: 0 };
+  };
+
   // Step 5: Function to update train visualization based on simulation data
   const updateTrainVisualization = () => {
     if (!networkInstance.current || !simulationTrains || simulationTrains.length === 0) {
@@ -118,6 +245,23 @@ const NetworkGraph = ({
     // Add updated train nodes with emoji representation
     const trainNodesToAdd = simulationTrains.map(train => {
       const trainId = `train_${train.Train_ID}`;
+      
+      // Calculate position using visual edge geometry
+      const visualPosition = interpolateAlongVisualEdge(train);
+      
+      // Debug logging for train position
+      if (train.Train_ID === '12001_SHATABDI') {
+        console.log('Train position debug:', {
+          trainId: train.Train_ID,
+          status: train.currentStatus,
+          isAtStation: train.isAtStation,
+          currentStop: train.currentStop?.Station_ID,
+          nextStop: train.nextStop?.Station_ID,
+          progress: train.progressPercentage,
+          visualPosition,
+          originalPosition: train.currentPosition
+        });
+      }
       
       // Get status-based color for train emoji background
       const getTrainColor = (status) => {
@@ -147,6 +291,10 @@ const NetworkGraph = ({
           tooltip += `Location: ${train.stationInfo}\n`;
         }
         
+        if (train.trackId) {
+          tooltip += `Track: ${train.trackId}\n`;
+        }
+        
         if (train.route && train.route.length > 0) {
           const origin = train.route[0];
           const destination = train.route[train.route.length - 1];
@@ -171,8 +319,8 @@ const NetworkGraph = ({
       return {
         id: trainId,
         label: '🚆', // Train emoji as the visual representation
-        x: train.currentPosition.x,
-        y: train.currentPosition.y,
+        x: visualPosition.x,
+        y: visualPosition.y,
         group: 'train',
         color: getTrainColor(train.currentStatus),
         title: createTooltip(),
@@ -420,7 +568,10 @@ const NetworkGraph = ({
 
   // Update train positions during live simulation
   useEffect(() => {
-    updateTrainVisualization();
+    // Only update if network is fully initialized
+    if (networkInstance.current && networkInstance.current.body && networkInstance.current.body.nodes) {
+      updateTrainVisualization();
+    }
   }, [simulationTrains, simulationTime]);
 
   // Legacy train position updates (for backward compatibility)

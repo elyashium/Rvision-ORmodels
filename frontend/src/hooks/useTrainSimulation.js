@@ -35,12 +35,193 @@ export const useTrainSimulation = () => {
     // First try to find direct track
     for (const [trackId, track] of Object.entries(networkData.tracks)) {
       if (track.from === startStation && track.to === endStation) {
-        return trackId;
+        return { trackId, track, isDirect: true };
       }
     }
     
-    // If no direct track found, return null (could implement multi-hop routing later)
+    // Try to find alternative route through route_alternatives
+    if (networkData.route_alternatives) {
+      const routeKey = `${startStation}_to_${endStation}`;
+      const altRouteKey = `${endStation}_to_${startStation}`;
+      
+      let routeInfo = networkData.route_alternatives[routeKey] || networkData.route_alternatives[altRouteKey];
+      
+      if (routeInfo) {
+        // Use primary route first
+        const primaryRoute = routeInfo.primary;
+        if (primaryRoute && primaryRoute.length > 0) {
+          const firstTrackId = primaryRoute[0];
+          const firstTrack = networkData.tracks[firstTrackId];
+          if (firstTrack) {
+            return { 
+              trackId: firstTrackId, 
+              track: firstTrack, 
+              isDirect: primaryRoute.length === 1,
+              fullRoute: primaryRoute
+            };
+          }
+        }
+        
+        // If primary route doesn't work, try alternatives
+        if (routeInfo.alternatives && routeInfo.alternatives.length > 0) {
+          for (const altRoute of routeInfo.alternatives) {
+            if (altRoute.length > 0) {
+              const firstTrackId = altRoute[0];
+              const firstTrack = networkData.tracks[firstTrackId];
+              if (firstTrack) {
+                return { 
+                  trackId: firstTrackId, 
+                  track: firstTrack, 
+                  isDirect: altRoute.length === 1,
+                  fullRoute: altRoute
+                };
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // If no route found, return null
     return null;
+  };
+
+  // Helper function to get edge path from vis-network
+  const getEdgePath = (fromStation, toStation, networkData, trackInfo = null) => {
+    if (!networkData?.stations) return null;
+    
+    const fromCoords = getStationCoordinates(fromStation, networkData);
+    const toCoords = getStationCoordinates(toStation, networkData);
+    
+    if (!fromCoords || !toCoords) return null;
+    
+    // If we have track info with a full route, create multi-point path
+    if (trackInfo && trackInfo.fullRoute && trackInfo.fullRoute.length > 1) {
+      const pathPoints = [];
+      
+      // Add starting point
+      pathPoints.push(fromCoords);
+      
+      // Add intermediate points based on the track route
+      for (let i = 0; i < trackInfo.fullRoute.length; i++) {
+        const trackId = trackInfo.fullRoute[i];
+        const track = networkData.tracks[trackId];
+        if (track) {
+          // Add intermediate station coordinates if this isn't the first or last track
+          if (i > 0) {
+            const intermediateStation = track.from;
+            const intermediateCoords = getStationCoordinates(intermediateStation, networkData);
+            if (intermediateCoords) {
+              pathPoints.push(intermediateCoords);
+            }
+          }
+        }
+      }
+      
+      // Add ending point
+      pathPoints.push(toCoords);
+      
+      return {
+        startPoint: fromCoords,
+        endPoint: toCoords,
+        path: pathPoints
+      };
+    }
+    
+    // Default to simple two-point path
+    return {
+      startPoint: fromCoords,
+      endPoint: toCoords,
+      path: [fromCoords, toCoords]
+    };
+  };
+
+  // Helper function to get station coordinates consistently
+  const getStationCoordinates = (stationId, networkData) => {
+    if (networkData && networkData.stations && networkData.stations[stationId]) {
+      const coords = networkData.stations[stationId].coordinates;
+      // Convert lat/lon to x/y coordinates (simplified projection)
+      const x = (coords.lon - 77.2197) * 10000; // Offset from NDLS and scale
+      const y = (coords.lat - 28.6431) * 10000; // Offset from NDLS and scale
+      return { x, y };
+    }
+    
+    // Fallback coordinates
+    const fallbackCoords = {
+      'NDLS': { x: 0, y: 0 },
+      'ANVR': { x: 300, y: -50 },
+      'Anand_Vihar': { x: 300, y: -50 },
+      'GZB': { x: 600, y: 0 },
+      'Ghaziabad': { x: 600, y: 0 },
+      'SBB': { x: 500, y: 150 },
+      'VVB': { x: 300, y: 100 },
+      'SHZM': { x: 150, y: 75 },
+      'DLI': { x: -100, y: 50 },
+      'MUT': { x: 800, y: -100 },
+      'Aligarh': { x: 900, y: 100 },
+    };
+    
+    return fallbackCoords[stationId] || { x: 0, y: 0 };
+  };
+
+  // Helper function to interpolate along a path
+  const interpolateAlongPath = (pathPoints, progress) => {
+    if (!pathPoints || pathPoints.length < 2) {
+      return { x: 0, y: 0 };
+    }
+    
+    if (pathPoints.length === 2) {
+      // Simple two-point interpolation
+      const start = pathPoints[0];
+      const end = pathPoints[1];
+      return {
+        x: start.x + (end.x - start.x) * progress,
+        y: start.y + (end.y - start.y) * progress
+      };
+    }
+    
+    // For multi-point paths (future enhancement)
+    // Calculate total path length and interpolate along segments
+    const totalLength = calculatePathLength(pathPoints);
+    const targetDistance = totalLength * progress;
+    
+    let currentDistance = 0;
+    for (let i = 0; i < pathPoints.length - 1; i++) {
+      const segmentStart = pathPoints[i];
+      const segmentEnd = pathPoints[i + 1];
+      const segmentLength = Math.sqrt(
+        Math.pow(segmentEnd.x - segmentStart.x, 2) + 
+        Math.pow(segmentEnd.y - segmentStart.y, 2)
+      );
+      
+      if (currentDistance + segmentLength >= targetDistance) {
+        // The target point is on this segment
+        const segmentProgress = (targetDistance - currentDistance) / segmentLength;
+        return {
+          x: segmentStart.x + (segmentEnd.x - segmentStart.x) * segmentProgress,
+          y: segmentStart.y + (segmentEnd.y - segmentStart.y) * segmentProgress
+        };
+      }
+      
+      currentDistance += segmentLength;
+    }
+    
+    // Fallback to the last point
+    return pathPoints[pathPoints.length - 1];
+  };
+
+  // Helper function to calculate total path length
+  const calculatePathLength = (pathPoints) => {
+    let totalLength = 0;
+    for (let i = 0; i < pathPoints.length - 1; i++) {
+      const start = pathPoints[i];
+      const end = pathPoints[i + 1];
+      totalLength += Math.sqrt(
+        Math.pow(end.x - start.x, 2) + 
+        Math.pow(end.y - start.y, 2)
+      );
+    }
+    return totalLength;
   };
 
   // Step 2: Pre-processing function for train data (Enhanced for multi-stop journeys)
@@ -112,15 +293,23 @@ export const useTrainSimulation = () => {
         ...trainData,
         route: processedRoute,
         
+        // Ensure we have a consistent Train_ID
+        Train_ID: trainData.Train_ID || trainData.train_id,
+        
         // Journey state tracking
         currentLegIndex: 0, // Which leg of journey train is on
         currentStopIndex: 0, // Which stop train is approaching/at
         isAtStation: false,
         stationArrivalTime: null,
         
-        // Dynamic state properties
+        // Dynamic state properties that persist throughout simulation
         currentStatus: 'Scheduled',
-        currentPosition: { x: 0, y: 0 },
+        currentPosition: getStationCoordinates(processedRoute[0].Station_ID, networkData) || { x: 0, y: 0 },
+        progressPercentage: 0,
+        
+        // Lifecycle tracking
+        hasStarted: false,
+        hasCompleted: false,
         
         // Store original data for reference
         originalData: trainData
@@ -142,34 +331,7 @@ export const useTrainSimulation = () => {
       };
     }
 
-    // Station coordinates mapping - dynamically generated from network data or fallback
-    const stationCoordinates = {};
-    
-    if (networkData && networkData.stations) {
-      // Use actual coordinates from network_graph.json
-      Object.entries(networkData.stations).forEach(([stationId, station]) => {
-        const coords = station.coordinates;
-        // Convert lat/lon to x/y coordinates (simplified projection)
-        const x = (coords.lon - 77.2197) * 10000; // Offset from NDLS and scale
-        const y = (coords.lat - 28.6431) * 10000; // Offset from NDLS and scale
-        stationCoordinates[stationId] = { x, y };
-      });
-    } else {
-      // Fallback coordinates
-      Object.assign(stationCoordinates, {
-        'NDLS': { x: 0, y: 0 },
-        'ANVR': { x: 300, y: -50 },
-        'Anand_Vihar': { x: 300, y: -50 },
-        'GZB': { x: 600, y: 0 },
-        'Ghaziabad': { x: 600, y: 0 },
-        'SBB': { x: 500, y: 150 },
-        'VVB': { x: 300, y: 100 },
-        'SHZM': { x: 150, y: 75 },
-        'DLI': { x: -100, y: 50 },
-        'MUT': { x: 800, y: -100 },
-        'Aligarh': { x: 900, y: 100 },
-      });
-    }
+    // Note: Station coordinates are now handled by getStationCoordinates() function
 
     const route = train.route;
     const firstStop = route[0];
@@ -179,11 +341,14 @@ export const useTrainSimulation = () => {
     if (currentTime < firstStop.departureTime) {
       return {
         status: 'Scheduled',
-        position: stationCoordinates[firstStop.Station_ID] || { x: 0, y: 0 },
+        position: getStationCoordinates(firstStop.Station_ID, networkData),
         currentStop: firstStop,
         nextStop: route[1] || null,
         isAtStation: true,
-        stationInfo: `Platform ${firstStop.Platform}`
+        stationInfo: `Platform ${firstStop.Platform} - Scheduled Departure`,
+        progressPercentage: 0,
+        hasStarted: false,
+        hasCompleted: false
       };
     }
 
@@ -191,11 +356,14 @@ export const useTrainSimulation = () => {
     if (lastStop.arrivalTime && currentTime >= lastStop.arrivalTime) {
       return {
         status: 'Arrived',
-        position: stationCoordinates[lastStop.Station_ID] || { x: 100, y: 0 },
+        position: getStationCoordinates(lastStop.Station_ID, networkData),
         currentStop: lastStop,
         nextStop: null,
         isAtStation: true,
-        stationInfo: `Platform ${lastStop.Platform} - Journey Complete`
+        stationInfo: `Platform ${lastStop.Platform} - Journey Complete`,
+        progressPercentage: 100,
+        hasStarted: true,
+        hasCompleted: true
       };
     }
 
@@ -211,28 +379,55 @@ export const useTrainSimulation = () => {
 
       // Check if train is between these two stops
       if (currentTime >= legDepartureTime && currentTime <= legArrivalTime) {
-        const currentStopCoords = stationCoordinates[currentStop.Station_ID] || { x: 0, y: 0 };
-        const nextStopCoords = stationCoordinates[nextStop.Station_ID] || { x: 100, y: 0 };
-
         // Calculate progress along this leg
         const legDuration = legArrivalTime.getTime() - legDepartureTime.getTime();
         const timeElapsed = currentTime.getTime() - legDepartureTime.getTime();
         const progressPercentage = Math.max(0, Math.min(1, timeElapsed / legDuration));
 
-        // Linear interpolation between current and next station
-        const currentX = currentStopCoords.x + (nextStopCoords.x - currentStopCoords.x) * progressPercentage;
-        const currentY = currentStopCoords.y + (nextStopCoords.y - currentStopCoords.y) * progressPercentage;
+        // Find the track/edge between these stations
+        const trackInfo = findTrackBetweenStations(currentStop.Station_ID, nextStop.Station_ID, networkData);
+        let position;
+
+        if (trackInfo) {
+          // Use track-based movement with proper route following
+          const edgePath = getEdgePath(currentStop.Station_ID, nextStop.Station_ID, networkData, trackInfo);
+          if (edgePath) {
+            // Interpolate along the actual edge path (may include intermediate stations)
+            position = interpolateAlongPath(edgePath.path, progressPercentage);
+            console.log(`Train following ${trackInfo.isDirect ? 'direct' : 'multi-hop'} track: ${trackInfo.trackId}`);
+          } else {
+            // Fallback to direct interpolation
+            const currentStopCoords = getStationCoordinates(currentStop.Station_ID, networkData);
+            const nextStopCoords = getStationCoordinates(nextStop.Station_ID, networkData);
+            position = {
+              x: currentStopCoords.x + (nextStopCoords.x - currentStopCoords.x) * progressPercentage,
+              y: currentStopCoords.y + (nextStopCoords.y - currentStopCoords.y) * progressPercentage
+            };
+          }
+        } else {
+          // No track found - use direct line as fallback
+          console.warn(`No track found between ${currentStop.Station_ID} and ${nextStop.Station_ID} - using direct route`);
+          const currentStopCoords = getStationCoordinates(currentStop.Station_ID, networkData);
+          const nextStopCoords = getStationCoordinates(nextStop.Station_ID, networkData);
+          position = {
+            x: currentStopCoords.x + (nextStopCoords.x - currentStopCoords.x) * progressPercentage,
+            y: currentStopCoords.y + (nextStopCoords.y - currentStopCoords.y) * progressPercentage
+          };
+        }
 
         const status = train.Initial_Reported_Delay_Mins > 0 ? 'Delayed' : 'En-Route';
 
         return {
           status,
-          position: { x: currentX, y: currentY },
+          position,
           currentStop: currentStop,
           nextStop: nextStop,
           isAtStation: false,
           progressPercentage,
-          stationInfo: `${currentStop.Station_Name} → ${nextStop.Station_Name}`
+          stationInfo: `${currentStop.Station_Name} → ${nextStop.Station_Name}`,
+          trackId: trackInfo?.trackId || null,
+          hasStarted: true,
+          hasCompleted: false
         };
       }
 
@@ -241,23 +436,29 @@ export const useTrainSimulation = () => {
           currentTime >= nextStop.arrivalTime && currentTime < nextStop.departureTime) {
         return {
           status: nextStop.Stop_Duration_Mins > 0 ? 'Stopped' : 'En-Route',
-          position: stationCoordinates[nextStop.Station_ID] || { x: 0, y: 0 },
+          position: getStationCoordinates(nextStop.Station_ID, networkData),
           currentStop: nextStop,
           nextStop: route[i + 2] || null,
           isAtStation: true,
-          stationInfo: `Platform ${nextStop.Platform} - ${nextStop.Stop_Duration_Mins}min stop`
+          stationInfo: `Platform ${nextStop.Platform} - ${nextStop.Stop_Duration_Mins}min stop`,
+          progressPercentage: Math.round((i + 1) / route.length * 100),
+          hasStarted: true,
+          hasCompleted: false
         };
       }
     }
 
-    // Fallback - return position at origin
+    // Fallback - return position at origin with preserved state
     return {
       status: 'Unknown',
-      position: stationCoordinates[firstStop.Station_ID] || { x: 0, y: 0 },
+      position: getStationCoordinates(firstStop.Station_ID, networkData),
       currentStop: firstStop,
       nextStop: route[1] || null,
       isAtStation: true,
-      stationInfo: 'Unknown Status'
+      stationInfo: 'Unknown Status',
+      progressPercentage: train.progressPercentage || 0,
+      hasStarted: train.hasStarted || false,
+      hasCompleted: train.hasCompleted || false
     };
   }, []);
 
@@ -310,35 +511,43 @@ export const useTrainSimulation = () => {
 
   // Step 4: Enhanced simulation loop for multi-stop journeys
   useEffect(() => {
-    if (!isRunning || !simulationTime || trains.length === 0) return;
+    if (!isRunning || !simulationTime) return;
 
     const intervalId = setInterval(() => {
-      // Advance the simulation clock
+      // Use a ref to track current simulation time to avoid stale closures
+      const currentTime = new Date();
+      
       setSimulationTime(prevTime => {
+        if (!prevTime) return currentTime;
         const newTime = new Date(prevTime.getTime() + (1000 * simulationSpeed / 60)); // Advance by scaled minute
         
-        // Update train positions based on new time
-        const updatedTrains = trains.map(train => {
-          const positionData = calculateTrainPosition(train, newTime, networkData);
-          return {
-            ...train,
-            currentStatus: positionData.status,
-            currentPosition: positionData.position,
-            currentStop: positionData.currentStop,
-            nextStop: positionData.nextStop,
-            isAtStation: positionData.isAtStation,
-            stationInfo: positionData.stationInfo,
-            progressPercentage: positionData.progressPercentage || 0
-          };
+        // Update train positions based on the new simulation time
+        setTrains(prevTrains => {
+          // Always preserve all trains, just update their positions and state
+          return prevTrains.map(train => {
+            const positionData = calculateTrainPosition(train, newTime, networkData);
+            return {
+              ...train, // Preserve all existing train data
+              currentStatus: positionData.status,
+              currentPosition: positionData.position,
+              currentStop: positionData.currentStop,
+              nextStop: positionData.nextStop,
+              isAtStation: positionData.isAtStation,
+              stationInfo: positionData.stationInfo,
+              progressPercentage: positionData.progressPercentage || train.progressPercentage || 0,
+              hasStarted: positionData.hasStarted !== undefined ? positionData.hasStarted : train.hasStarted,
+              hasCompleted: positionData.hasCompleted !== undefined ? positionData.hasCompleted : train.hasCompleted,
+              trackId: positionData.trackId || train.trackId
+            };
+          });
         });
         
-        setTrains(updatedTrains);
         return newTime;
       });
     }, 50); // Tick every 50ms
 
     return () => clearInterval(intervalId);
-  }, [isRunning, simulationTime, trains, networkData, simulationSpeed, calculateTrainPosition]);
+  }, [isRunning, networkData, simulationSpeed, calculateTrainPosition]); // Keep minimal dependencies
 
   // Control functions
   const startSimulation = useCallback(() => {

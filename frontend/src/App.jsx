@@ -106,39 +106,39 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-rail-darker to-rail-dark text-white">
       {/* Header */}
-      <header className="rail-card m-4 mb-0 px-6 py-4 border-b-0 rounded-b-none">
+      <header className="rail-card m-3 mb-0 px-4 py-3 border-b-0 rounded-b-none">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-3">
-              <Train className="w-8 h-8 text-rail-accent" />
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              <Train className="w-6 h-6 text-rail-accent" />
               <div>
-                <h1 className="text-2xl font-bold text-white">R-Vision</h1>
-                <p className="text-sm text-gray-400">Intelligent Rail Optimization System</p>
+                <h1 className="text-lg font-bold text-white">R-Vision</h1>
+                <p className="text-xs text-gray-500">Intelligent Rail Optimization System</p>
               </div>
             </div>
           </div>
           
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-4">
             {/* System Health Indicator */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1">
               {getHealthStatusIcon()}
-              <span className="text-sm font-medium capitalize">{systemHealth}</span>
+              <span className="text-xs font-medium capitalize">{systemHealth}</span>
             </div>
             
             {/* Simulation Status */}
-            <div className="flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${isSimulationRunning ? 'bg-rail-success animate-pulse' : 'bg-rail-gray'}`}></div>
-              <span className="text-sm font-medium">
-                {isSimulationRunning ? 'Live Simulation' : 'Simulation Paused'}
+            <div className="flex items-center space-x-1">
+              <div className={`w-2 h-2 rounded-full ${isSimulationRunning ? 'bg-rail-success animate-pulse' : 'bg-rail-gray'}`}></div>
+              <span className="text-xs font-medium">
+                {isSimulationRunning ? 'Live' : 'Paused'}
               </span>
             </div>
             
             {/* Active Trains Count */}
             {networkState && (
-              <div className="flex items-center space-x-2">
-                <Activity className="w-4 h-4 text-rail-accent" />
-                <span className="text-sm font-medium">
-                  {Object.keys(networkState.trains || {}).length} Trains Active
+              <div className="flex items-center space-x-1">
+                <Activity className="w-3 h-3 text-rail-accent" />
+                <span className="text-xs font-medium">
+                  {Object.keys(networkState.trains || {}).length} Trains
                 </span>
               </div>
             )}
@@ -147,9 +147,9 @@ function App() {
       </header>
 
       {/* Main Layout */}
-      <div className="flex h-[calc(100vh-120px)] m-4 mt-0 space-x-4 overflow-hidden">
+      <div className="flex h-[calc(100vh-80px)] p-4 pt-0 gap-4">
         {/* Left Sidebar - Control Panel */}
-        <div className="w-80 flex flex-col">
+        <div className="w-72 flex flex-col">
           <ControlPanel
             networkState={networkState}
             isSimulationRunning={isSimulationRunning}
@@ -160,8 +160,9 @@ function App() {
           />
         </div>
 
-        {/* Main Content - Network Visualization */}
-        <div className="flex-1 flex flex-col min-h-0">
+        {/* Main Content - Network Visualization and Alerts */}
+        <div className="flex-1 flex gap-4 min-h-0">
+          {/* Network Visualization */}
           <div className="flex-1 rail-card p-4 min-h-0">
             <NetworkGraph
               networkState={networkState}
@@ -169,8 +170,8 @@ function App() {
             />
           </div>
 
-          {/* Bottom Panel - Alerts and Recommendations */}
-          <div className="h-64 mt-4 flex-shrink-0">
+          {/* Right Panel - Alerts and Recommendations */}
+          <div className="w-80 flex-shrink-0">
             <AlertsAndRecommendations
               alerts={alerts}
               recommendations={recommendations}

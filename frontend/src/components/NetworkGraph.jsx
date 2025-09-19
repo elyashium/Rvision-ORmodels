@@ -3,16 +3,67 @@ import { Network } from 'vis-network';
 import { DataSet } from 'vis-data';
 import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 
-const NetworkGraph = ({ networkState, isSimulationRunning, leftPanelContent, rightPanelContent, onFullscreenChange }) => {
+const NetworkGraph = ({ 
+  networkState, 
+  isSimulationRunning, 
+  leftPanelContent, 
+  rightPanelContent, 
+  onFullscreenChange,
+  // New props for live simulation
+  simulationTrains = [], 
+  simulationTime = null,
+  networkData = null
+}) => {
   const networkContainer = useRef(null);
   const networkInstance = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [trainPositions, setTrainPositions] = useState({});
   const [showLeftPanel, setShowLeftPanel] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
+  const [trainNodes, setTrainNodes] = useState(new DataSet());
 
   // Network graph data (stations and tracks) - loaded from your network_graph.json structure
   const getNetworkData = () => {
+    // Use actual network data if available, otherwise fall back to hardcoded data
+    if (networkData && networkData.stations && networkData.tracks) {
+      const nodes = new DataSet();
+      const edges = new DataSet();
+
+      // Create station nodes from network_graph.json
+      Object.entries(networkData.stations).forEach(([stationId, station]) => {
+        const coords = station.coordinates;
+        // Convert lat/lon to x/y coordinates (simplified projection)
+        const x = (coords.lon - 77.2197) * 10000; // Offset from NDLS and scale
+        const y = (coords.lat - 28.6431) * 10000; // Offset from NDLS and scale
+        
+        nodes.add({
+          id: stationId,
+          label: station.name.replace(' ', '\n'),
+          x: x,
+          y: y,
+          group: station.type,
+          title: `${station.name} (${station.type})\nPlatforms: ${station.platforms}`
+        });
+      });
+
+      // Create track edges from network_graph.json
+      Object.entries(networkData.tracks).forEach(([trackId, track]) => {
+        edges.add({
+          id: trackId,
+          from: track.from,
+          to: track.to,
+          label: `${track.travel_time_minutes}min`,
+          color: { color: track.priority === 'high' ? '#495057' : '#6c757d' },
+          width: track.priority === 'high' ? 2 : 1,
+          dashes: track.track_type === 'single_line' ? [5, 5] : false,
+          title: `${trackId} (${track.travel_time_minutes} min)\n${track.track_type}, ${track.max_speed_kmh} km/h`
+        });
+      });
+
+      return { nodes, edges };
+    }
+
+    // Fallback hardcoded data
     const nodes = new DataSet([
       // Stations as nodes
       { id: 'NDLS', label: 'New Delhi\nStation', x: 0, y: 0, group: 'major_junction', title: 'New Delhi Station (Major Junction)' },
@@ -48,7 +99,59 @@ const NetworkGraph = ({ networkState, isSimulationRunning, leftPanelContent, rig
     return { nodes, edges };
   };
 
-  // Add train nodes to the visualization
+  // Step 5: Function to update train visualization based on simulation data
+  const updateTrainVisualization = () => {
+    if (!networkInstance.current || !simulationTrains || simulationTrains.length === 0) {
+      return;
+    }
+
+    const nodes = networkInstance.current.body.data.nodes;
+    
+    // Clear existing train nodes
+    const existingTrainIds = nodes.get().filter(node => node.id.startsWith('train_')).map(node => node.id);
+    if (existingTrainIds.length > 0) {
+      nodes.remove(existingTrainIds);
+    }
+
+    // Add updated train nodes
+    const trainNodesToAdd = simulationTrains.map(train => {
+      const trainId = `train_${train.Train_ID}`;
+      
+      // Get status-based color
+      const getTrainColor = (status) => {
+        switch (status) {
+          case 'Scheduled':
+            return { background: '#6c757d', border: '#495057' }; // Gray
+          case 'En-Route':
+            return { background: '#28a745', border: '#198754' }; // Green
+          case 'Delayed':
+            return { background: '#ffc107', border: '#e0a800' }; // Orange
+          case 'Arrived':
+            return { background: '#007bff', border: '#0056b3' }; // Blue
+          default:
+            return { background: '#dc3545', border: '#b02a37' }; // Red
+        }
+      };
+
+      return {
+        id: trainId,
+        label: train.Train_ID.split('_')[0],
+        x: train.currentPosition.x,
+        y: train.currentPosition.y,
+        group: 'train',
+        color: getTrainColor(train.currentStatus),
+        title: `${train.Train_ID}\nType: ${train.Train_Type}\nStatus: ${train.currentStatus}\nRoute: ${train.Section_Start} → ${train.Section_End}\nDelay: ${train.Initial_Reported_Delay_Mins || 0}min`,
+        physics: false,
+        shape: 'triangle',
+        size: 12,
+        font: { size: 8, color: '#ffffff' }
+      };
+    });
+
+    nodes.add(trainNodesToAdd);
+  };
+
+  // Legacy function for backward compatibility (now deprecated)
   const addTrainNodes = (nodes, trains) => {
     if (!trains) return;
 
@@ -252,7 +355,12 @@ const NetworkGraph = ({ networkState, isSimulationRunning, leftPanelContent, rig
     };
   }, []);
 
-  // Update train positions during simulation
+  // Update train positions during live simulation
+  useEffect(() => {
+    updateTrainVisualization();
+  }, [simulationTrains, simulationTime]);
+
+  // Legacy train position updates (for backward compatibility)
   useEffect(() => {
     if (networkInstance.current && networkState?.trains) {
       const { nodes } = networkInstance.current.body.data;
@@ -469,13 +577,13 @@ const NetworkGraph = ({ networkState, isSimulationRunning, leftPanelContent, rig
       </div>
 
       {/* Status Indicator */}
-      {networkState && (
+      {(networkState || simulationTrains.length > 0) && (
         <div className="absolute top-16 right-2 rail-card p-2">
           <div className="text-xs space-y-1">
             <div className="flex justify-between">
               <span className="text-rail-blue">Active Trains:</span>
               <span className="text-rail-accent font-medium">
-                {Object.keys(networkState.trains || {}).length}
+                {simulationTrains.length > 0 ? simulationTrains.length : Object.keys(networkState?.trains || {}).length}
               </span>
             </div>
             <div className="flex justify-between">
@@ -484,6 +592,14 @@ const NetworkGraph = ({ networkState, isSimulationRunning, leftPanelContent, rig
                 {isSimulationRunning ? 'Running' : 'Paused'}
               </span>
             </div>
+            {simulationTime && (
+              <div className="flex justify-between">
+                <span className="text-rail-blue">Sim Time:</span>
+                <span className="text-rail-accent font-medium text-xs">
+                  {simulationTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}

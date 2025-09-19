@@ -4,6 +4,7 @@ import ControlPanel from './components/ControlPanel';
 import NetworkGraph from './components/NetworkGraph';
 import AlertsAndRecommendations from './components/AlertsAndRecommendations';
 import { apiService } from './services/apiService';
+import { useTrainSimulation } from './hooks/useTrainSimulation';
 import './App.css';
 
 function App() {
@@ -13,6 +14,20 @@ function App() {
   const [recommendations, setRecommendations] = useState([]);
   const [systemHealth, setSystemHealth] = useState('healthy');
   const [isNetworkFullscreen, setIsNetworkFullscreen] = useState(false);
+
+  // Live simulation state
+  const {
+    networkData,
+    trains: simulationTrains,
+    simulationTime,
+    simulationSpeed,
+    isRunning: isLiveSimulationRunning,
+    loadSchedule,
+    startSimulation: startLiveSimulation,
+    stopSimulation: stopLiveSimulation,
+    resetSimulation,
+    setSimulationSpeed
+  } = useTrainSimulation();
 
   // Fetch initial system state
   useEffect(() => {
@@ -65,18 +80,43 @@ function App() {
     setRecommendations(prev => [recommendation, ...prev.slice(0, 4)]); // Keep last 5 recommendations
   };
 
-  const handleScheduleUploaded = (newNetworkState) => {
-    setNetworkState(newNetworkState);
-    setSystemHealth(newNetworkState.network_status?.network_health || 'healthy');
-    addAlert('success', 'Schedule loaded successfully', `${Object.keys(newNetworkState.trains || {}).length} trains initialized`);
+  const handleScheduleUploaded = async (newNetworkState) => {
+    // If newNetworkState is provided, use legacy mode
+    if (newNetworkState) {
+      setNetworkState(newNetworkState);
+      setSystemHealth(newNetworkState.network_status?.network_health || 'healthy');
+      addAlert('success', 'Schedule loaded successfully', `${Object.keys(newNetworkState.trains || {}).length} trains initialized`);
+      return;
+    }
+
+    // Otherwise, use live simulation
+    try {
+      const simulationData = await loadSchedule();
+      setSystemHealth('healthy');
+      addAlert('success', 'Live schedule loaded successfully', `${simulationData.trains.length} trains initialized for simulation`);
+    } catch (error) {
+      console.error('Failed to load live schedule:', error);
+      addAlert('error', 'Failed to load schedule', error.message);
+    }
   };
 
   const handleSimulationStart = () => {
-    setIsSimulationRunning(true);
-    addAlert('info', 'Simulation started', 'Real-time train monitoring active');
+    if (simulationTrains.length > 0) {
+      // Use live simulation
+      startLiveSimulation();
+      setIsSimulationRunning(true);
+      addAlert('info', 'Live simulation started', 'Trains are now moving according to their schedules');
+    } else {
+      // Use legacy simulation
+      setIsSimulationRunning(true);
+      addAlert('info', 'Simulation started', 'Real-time train monitoring active');
+    }
   };
 
   const handleSimulationStop = () => {
+    if (isLiveSimulationRunning) {
+      stopLiveSimulation();
+    }
     setIsSimulationRunning(false);
     addAlert('info', 'Simulation stopped', 'Real-time monitoring paused');
   };
@@ -129,11 +169,11 @@ function App() {
             </div>
             
             {/* Active Trains Count */}
-            {networkState && (
+            {(networkState || simulationTrains.length > 0) && (
               <div className="flex items-center space-x-1">
                 <Activity className="w-3 h-3 text-rail-text" />
                 <span className="text-xs font-medium text-rail-text">
-                  {Object.keys(networkState.trains || {}).length} Trains
+                  {simulationTrains.length > 0 ? simulationTrains.length : Object.keys(networkState?.trains || {}).length} Trains
                 </span>
               </div>
             )}
@@ -154,6 +194,12 @@ function App() {
               onSimulationStart={handleSimulationStart}
               onSimulationStop={handleSimulationStop}
               onDisruptionReported={handleDisruptionReported}
+              // Live simulation props
+              simulationTrains={simulationTrains}
+              simulationTime={simulationTime}
+              simulationSpeed={simulationSpeed}
+              setSimulationSpeed={setSimulationSpeed}
+              onResetSimulation={resetSimulation}
             />
           </div>
 
@@ -165,6 +211,10 @@ function App() {
                 networkState={networkState}
                 isSimulationRunning={isSimulationRunning}
                 onFullscreenChange={setIsNetworkFullscreen}
+                // Live simulation props
+                simulationTrains={simulationTrains}
+                simulationTime={simulationTime}
+                networkData={networkData}
                 leftPanelContent={
                   <ControlPanel
                     networkState={networkState}
@@ -173,6 +223,12 @@ function App() {
                     onSimulationStart={handleSimulationStart}
                     onSimulationStop={handleSimulationStop}
                     onDisruptionReported={handleDisruptionReported}
+                    // Live simulation props
+                    simulationTrains={simulationTrains}
+                    simulationTime={simulationTime}
+                    simulationSpeed={simulationSpeed}
+                    setSimulationSpeed={setSimulationSpeed}
+                    onResetSimulation={resetSimulation}
                   />
                 }
                 rightPanelContent={
@@ -212,6 +268,10 @@ function App() {
             networkState={networkState}
             isSimulationRunning={isSimulationRunning}
             onFullscreenChange={setIsNetworkFullscreen}
+            // Live simulation props
+            simulationTrains={simulationTrains}
+            simulationTime={simulationTime}
+            networkData={networkData}
             leftPanelContent={
               <ControlPanel
                 networkState={networkState}
@@ -220,6 +280,12 @@ function App() {
                 onSimulationStart={handleSimulationStart}
                 onSimulationStop={handleSimulationStop}
                 onDisruptionReported={handleDisruptionReported}
+                // Live simulation props
+                simulationTrains={simulationTrains}
+                simulationTime={simulationTime}
+                simulationSpeed={simulationSpeed}
+                setSimulationSpeed={setSimulationSpeed}
+                onResetSimulation={resetSimulation}
               />
             }
             rightPanelContent={

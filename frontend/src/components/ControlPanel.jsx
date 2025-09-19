@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, Play, Square, AlertTriangle, Settings, RefreshCw } from 'lucide-react';
 import DisruptionModal from './DisruptionModal';
+import SimulationControls from './SimulationControls';
 import { apiService, handleApiError } from '../services/apiService';
 
 const ControlPanel = ({ 
@@ -9,7 +10,13 @@ const ControlPanel = ({
   onScheduleUploaded, 
   onSimulationStart, 
   onSimulationStop, 
-  onDisruptionReported 
+  onDisruptionReported,
+  // Live simulation props
+  simulationTrains = [],
+  simulationTime = null,
+  simulationSpeed = 1000,
+  setSimulationSpeed = () => {},
+  onResetSimulation = () => {}
 }) => {
   const [isDisruptionModalOpen, setIsDisruptionModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -17,22 +24,30 @@ const ControlPanel = ({
 
   const handleScheduleUpload = async () => {
     setIsLoading(true);
-    setUploadStatus('Initializing railway network...');
+    setUploadStatus('Loading schedule and network data...');
     
     try {
-      // For the hackathon, we simulate schedule upload by resetting the system
-      const response = await apiService.resetSimulation();
+      // Try live simulation first
+      await onScheduleUploaded();
+      setUploadStatus('Live schedule loaded successfully!');
+      setTimeout(() => setUploadStatus(''), 3000);
+    } catch (liveError) {
+      console.warn('Live simulation failed, falling back to legacy mode:', liveError);
       
-      if (response.data.status === 'success') {
-        setUploadStatus('Schedule loaded successfully!');
-        onScheduleUploaded(response.data.network_state);
+      try {
+        // Fallback to legacy simulation
+        const response = await apiService.resetSimulation();
         
-        setTimeout(() => setUploadStatus(''), 3000);
+        if (response.data.status === 'success') {
+          setUploadStatus('Legacy schedule loaded successfully!');
+          onScheduleUploaded(response.data.network_state);
+          setTimeout(() => setUploadStatus(''), 3000);
+        }
+      } catch (legacyError) {
+        const errorInfo = handleApiError(legacyError);
+        setUploadStatus(`Error: ${errorInfo.message}`);
+        setTimeout(() => setUploadStatus(''), 5000);
       }
-    } catch (error) {
-      const errorInfo = handleApiError(error);
-      setUploadStatus(`Error: ${errorInfo.message}`);
-      setTimeout(() => setUploadStatus(''), 5000);
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +141,21 @@ const ControlPanel = ({
           )}
         </div>
 
-        {/* Simulation Controls */}
+        {/* Live Simulation Controls - Show if we have simulation data */}
+        {simulationTrains.length > 0 && (
+          <SimulationControls
+            simulationSpeed={simulationSpeed}
+            setSimulationSpeed={setSimulationSpeed}
+            isRunning={isSimulationRunning}
+            onStart={onSimulationStart}
+            onStop={onSimulationStop}
+            onReset={onResetSimulation}
+            simulationTime={simulationTime}
+            trainsCount={simulationTrains.length}
+          />
+        )}
+
+        {/* Legacy Simulation Controls */}
         {networkState && (
           <div className="space-y-3">
             <h3 className="text-xs font-medium text-rail-text-secondary uppercase tracking-wide">

@@ -101,18 +101,25 @@ body {
   @apply fixed top-4 left-1/2 transform -translate-x-1/2 z-50;
   @apply bg-rail-darker border border-rail-gray rounded-full;
   @apply px-4 py-2 shadow-sm backdrop-blur-sm;
-  @apply transition-all duration-300 ease-out;
+  @apply transition-all duration-500 ease-in-out;
   max-width: 200px;
 }
 
 .notch-header:hover {
-  @apply px-6 py-3 shadow-md;
+  @apply px-6 py-3 shadow-lg;
+  @apply bg-black border-black;
   max-width: 600px;
+}
+
+/* Force all text and icons to white on hover */
+.notch-header:hover * {
+  @apply text-white !important;
+  color: white !important;
 }
 
 .notch-content {
   @apply flex items-center justify-center space-x-2;
-  @apply transition-all duration-300 ease-out;
+  @apply transition-all duration-500 ease-in-out;
 }
 
 .notch-header:hover .notch-content {
@@ -121,7 +128,7 @@ body {
 
 .notch-expanded {
   @apply opacity-0 max-w-0 overflow-hidden;
-  @apply transition-all duration-300 ease-out;
+  @apply transition-all duration-500 ease-in-out;
 }
 
 .notch-header:hover .notch-expanded {

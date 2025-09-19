@@ -145,8 +145,8 @@ def report_event():
                 "error": f"Failed to apply event to train {event_data.get('train_id')}"
             }), 400
         
-        # Step 2: Run multi-strategy optimization
-        multi_strategy_results = multi_strategy_optimizer.run_all_strategies(network)
+        # Step 2: Run multi-strategy optimization and generate schedule data
+        multi_strategy_results = multi_strategy_optimizer.generate_strategy_schedules(network)
         
         # Step 3: Format the response
         response = {
@@ -169,7 +169,7 @@ def report_event():
 def accept_recommendation():
     """
     Accept and apply a recommendation from the optimizer.
-    This simulates the human operator accepting the AI's suggestion.
+    This applies the actual action to create a new network state.
     """
     try:
         if not network:
@@ -180,24 +180,45 @@ def accept_recommendation():
         if not recommendation_data or 'recommendation_id' not in recommendation_data:
             return jsonify({"error": "Invalid recommendation data"}), 400
         
-        # In a real system, you would apply the recommended action
-        # For the prototype, we'll just log it and update the train status
+        # Get the action from the recommendation
         action = recommendation_data.get('action', {})
-        train_id = action.get('train_id')
         
-        if train_id:
-            train = network.get_train(train_id)
-            if train:
-                train.status = f"Action Applied: {action.get('action_type', 'Unknown')}"
-                print(f"✅ RECOMMENDATION ACCEPTED: {action.get('description', 'No description')}")
+        if not action:
+            return jsonify({"error": "No action found in recommendation"}), 400
+        
+        print(f"🎯 PROCESSING RECOMMENDATION: {recommendation_data.get('recommendation_id')}")
+        print(f"   Action: {action.get('action_type')} for train {action.get('train_id')}")
+        
+        # Apply the recommended action to the network
+        success = network.apply_action(action)
+        
+        if not success:
+            return jsonify({
+                "error": f"Failed to apply action {action.get('action_type')} to train {action.get('train_id')}"
+            }), 400
+        
+        # Save the modified schedule to file
+        network.save_current_schedule("strategy_modified_schedule.json")
+        
+        # Get the updated network state after applying the action
+        updated_state = network.get_state_snapshot()
+        
+        print(f"✅ RECOMMENDATION ACCEPTED AND APPLIED SUCCESSFULLY!")
+        print(f"   Network state updated with {len(updated_state.get('trains', {}))} trains")
         
         return jsonify({
             "status": "success",
-            "message": "Recommendation accepted and applied",
-            "network_state": network.get_state_snapshot()
+            "message": f"Recommendation accepted and applied: {action.get('description', 'Action applied')}",
+            "network_state": updated_state,
+            "applied_action": {
+                "action_type": action.get('action_type'),
+                "train_id": action.get('train_id'),
+                "description": action.get('description')
+            }
         })
     
     except Exception as e:
+        print(f"❌ ERROR APPLYING RECOMMENDATION: {str(e)}")
         return jsonify({"error": f"Failed to accept recommendation: {str(e)}"}), 500
 
 @app.route('/api/reset', methods=['POST'])

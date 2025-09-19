@@ -642,6 +642,62 @@ class MultiStrategyOptimizer:
         
         print("✅ MULTI-STRATEGY ANALYSIS COMPLETED")
         return results
+
+    def generate_strategy_schedules(self, network_model: RailwayNetwork) -> Dict[str, Any]:
+        """
+        Generate actual schedule data for each strategy by applying the recommendations.
+        Returns strategy results with generated schedule data for simulation.
+        """
+        print("📋 GENERATING STRATEGY SCHEDULES...")
+        
+        # First run all strategies to get recommendations
+        strategy_results = self.run_all_strategies(network_model)
+        
+        # Now generate schedule data for each strategy
+        for strategy_key, strategy_result in strategy_results.items():
+            print(f"\n📊 Generating schedule for {strategy_key} strategy...")
+            
+            # Create a copy of the network for this strategy
+            strategy_network = copy.deepcopy(network_model)
+            
+            # Apply the strategy's recommendation if it exists
+            if (strategy_result.get("status") == "ConflictFound" and 
+                strategy_result.get("recommendation") and 
+                strategy_result["recommendation"].get("action")):
+                
+                action = strategy_result["recommendation"]["action"]
+                print(f"   Applying {action.get('action_type')} to {action.get('train_id')}")
+                
+                # Apply the action to the strategy network
+                strategy_network.apply_action(action)
+                
+                # Save the strategy-specific schedule
+                filename = f"strategy_{strategy_key}_schedule.json"
+                strategy_network.save_current_schedule(filename)
+                
+                # Get the modified network state
+                strategy_state = strategy_network.get_state_snapshot()
+                
+                # Add the schedule data to the strategy result
+                strategy_result["schedule_data"] = strategy_state
+                strategy_result["schedule_file"] = filename
+                strategy_result["applied_action"] = action
+                
+                print(f"   ✅ {strategy_key} schedule generated: {filename}")
+                
+            else:
+                # No action needed - use baseline schedule
+                baseline_state = strategy_network.get_state_snapshot()
+                strategy_result["schedule_data"] = baseline_state
+                strategy_result["schedule_file"] = "baseline_schedule.json"
+                strategy_result["applied_action"] = None
+                
+                # Save baseline schedule
+                strategy_network.save_current_schedule("baseline_schedule.json")
+                print(f"   ✅ {strategy_key} using baseline schedule")
+        
+        print("📋 ALL STRATEGY SCHEDULES GENERATED")
+        return strategy_results
     
     def _run_strategy(self, network: RailwayNetwork, strategy_key: str, strategy_config: Dict) -> Dict[str, Any]:
         """Run optimization with a specific strategy."""

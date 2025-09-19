@@ -265,7 +265,10 @@ const MultiStrategySimulation = ({
                     onClick={() => onRunSimulation && onRunSimulation({
                       strategy: strategyKey,
                       recommendation: strategy.recommendation || {},
-                      strategyName: strategy.strategy_name || strategyKey.charAt(0).toUpperCase() + strategyKey.slice(1)
+                      strategyName: strategy.strategy_name || strategyKey.charAt(0).toUpperCase() + strategyKey.slice(1),
+                      schedule_data: strategy.schedule_data,
+                      schedule_file: strategy.schedule_file,
+                      applied_action: strategy.applied_action
                     })}
                     className="w-full rail-button-secondary flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 text-white"
                   >

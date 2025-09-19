@@ -27,6 +27,7 @@ function App() {
     simulationSpeed,
     isRunning: isLiveSimulationRunning,
     loadSchedule,
+    loadStrategySimulation,
     startSimulation: startLiveSimulation,
     stopSimulation: stopLiveSimulation,
     resetSimulation,
@@ -178,40 +179,59 @@ function App() {
   const handleRunSimulation = async (strategyData) => {
     try {
       addAlert('info', `Running ${strategyData.strategyName} simulation`, 
-        'Visualizing strategy outcomes on the network map...');
+        'Loading strategy-specific schedule data...');
       
-      // If there's a recommendation, apply it temporarily to see its effects
-      if (strategyData.recommendation && Object.keys(strategyData.recommendation).length > 0) {
-        const response = await apiService.acceptRecommendation(strategyData.recommendation);
+      // Check if the strategy data includes schedule_data from the backend
+      if (strategyData.schedule_data) {
+        console.log('Using strategy schedule data from backend:', strategyData.schedule_data);
         
-        if (response.data.status === 'success') {
-          // Get updated network state to visualize the simulation
-          const stateResponse = await apiService.getCurrentState();
-          setNetworkState(stateResponse.data);
-          
-          // Start the live simulation to show the strategy in action
-          if (stateResponse.data.trains && stateResponse.data.trains.length > 0) {
-            setSimulationTrains(stateResponse.data.trains);
-            handleSimulationStart();
+        // Use the schedule data that was pre-calculated by the backend
+        setNetworkState(strategyData.schedule_data);
+        
+        // Load the strategy simulation data into the live simulation
+        if (strategyData.schedule_data.trains && strategyData.schedule_data.trains.length > 0) {
+          try {
+            const simulationResult = loadStrategySimulation(strategyData.schedule_data);
             
-            addAlert('success', `${strategyData.strategyName} simulation started`, 
-              'Watch the network visualization to see the strategy in action');
+            if (simulationResult && simulationResult.trains.length > 0) {
+              // Start the live simulation to show the strategy in action
+              startLiveSimulation();
+              
+              const actionText = strategyData.applied_action 
+                ? `with ${strategyData.applied_action.action_type} applied to ${strategyData.applied_action.train_id}`
+                : 'with baseline schedule';
+              
+              addAlert('success', `${strategyData.strategyName} simulation started`, 
+                `Showing ${simulationResult.trains.length} trains ${actionText}`);
+            } else {
+              addAlert('warning', 'No trains loaded for simulation', 
+                'Unable to start simulation with strategy data');
+            }
+          } catch (loadError) {
+            console.error('Failed to load strategy simulation:', loadError);
+            addAlert('error', 'Failed to load simulation data', loadError.message);
           }
+        } else {
+          addAlert('warning', 'No train data in strategy', 
+            'Strategy schedule does not contain train information');
         }
       } else {
-        // For strategies without recommendations (like NoConflict), just start the current simulation
+        // Fallback to old method if schedule_data is not available
+        addAlert('warning', 'No strategy schedule data available', 
+          'Using fallback method to run simulation');
+        
+        // Get current state and run simulation
         const stateResponse = await apiService.getCurrentState();
         setNetworkState(stateResponse.data);
         
         if (stateResponse.data.trains && stateResponse.data.trains.length > 0) {
-          setSimulationTrains(stateResponse.data.trains);
-          handleSimulationStart();
+          const simulationResult = loadStrategySimulation(stateResponse.data);
           
-          addAlert('success', `${strategyData.strategyName} baseline simulation started`, 
-            'Showing current network state - no optimization changes needed');
-        } else {
-          addAlert('info', 'No active trains for simulation', 
-            'Add some trains to the network to run simulations');
+          if (simulationResult && simulationResult.trains.length > 0) {
+            startLiveSimulation();
+            addAlert('success', `${strategyData.strategyName} simulation started`, 
+              'Running with current network state');
+          }
         }
       }
     } catch (error) {

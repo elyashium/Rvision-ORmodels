@@ -154,9 +154,56 @@ class Train:
         """Switch to an alternative route."""
         if route_index < len(self.alternative_routes):
             self.current_route = self.alternative_routes[route_index]
+            additional_delay = max(0, self.current_route.total_time_minutes - (self.primary_route.total_time_minutes if self.primary_route else 0))
+            self.actual_delay_mins += additional_delay
             self.status = f"Rerouted via {self.current_route.route_type} route"
+            
+            print(f"🔀 {self.get_name()} switched to alternative route {route_index + 1}")
+            print(f"   New route: {self.current_route.route_type} via {len(self.current_route.stations)} stations")
+            print(f"   Additional delay: {additional_delay} minutes")
+            
             return True
         return False
+
+    def apply_halt(self, halt_duration_mins: int, reason: str = "Optimization") -> bool:
+        """Apply a halt to the train for a specified duration."""
+        self.actual_delay_mins += halt_duration_mins
+        self.status = f"Halted ({reason}) - {halt_duration_mins} min"
+        
+        print(f"⏸️ {self.get_name()} halted for {halt_duration_mins} minutes")
+        print(f"   Reason: {reason}")
+        print(f"   Total delay now: {self.actual_delay_mins} minutes")
+        
+        return True
+
+    def apply_cancellation(self, reason: str = "Optimization") -> bool:
+        """Cancel the train service."""
+        self.status = f"Cancelled ({reason})"
+        
+        print(f"❌ {self.get_name()} cancelled")
+        print(f"   Reason: {reason}")
+        
+        return True
+
+    def apply_speed_adjustment(self, adjustment_factor: float, reason: str = "Optimization") -> bool:
+        """Apply speed adjustment to the train."""
+        # Adjust the scheduled times based on speed factor
+        if adjustment_factor > 1.0:
+            # Slower - add delay
+            additional_delay = int((adjustment_factor - 1.0) * 60)  # Convert factor to minutes
+            self.actual_delay_mins += additional_delay
+            self.status = f"Speed Reduced ({reason})"
+        elif adjustment_factor < 1.0:
+            # Faster - potentially reduce delay
+            time_saved = int((1.0 - adjustment_factor) * 60)
+            self.actual_delay_mins = max(0, self.actual_delay_mins - time_saved)
+            self.status = f"Speed Increased ({reason})"
+        
+        print(f"🚅 {self.get_name()} speed adjusted by {adjustment_factor:.2f}x")
+        print(f"   Reason: {reason}")
+        print(f"   Current delay: {self.actual_delay_mins} minutes")
+        
+        return True
     
     def get_current_route_info(self) -> Dict[str, Any]:
         """Get information about the current route."""
@@ -284,6 +331,107 @@ class RailwayNetwork:
         print(f"   Reason: {reason}")
         
         return True
+
+    def apply_action(self, action_data: Dict) -> bool:
+        """
+        Apply a recommended action from the optimizer to the network.
+        This implements the actual action (Halt, Reroute, Cancel, etc.)
+        """
+        action_type = action_data.get('action_type')
+        train_id = action_data.get('train_id')
+        
+        if not train_id:
+            print(f"ERROR: No train_id provided in action data")
+            return False
+            
+        train = self.get_train(train_id)
+        if not train:
+            print(f"ERROR: Train {train_id} not found in network.")
+            return False
+        
+        print(f"🔧 APPLYING ACTION: {action_type} to {train.get_name()}")
+        
+        success = False
+        
+        if action_type == "Halt":
+            duration_mins = action_data.get('duration_mins', 10)
+            success = train.apply_halt(duration_mins, "AI Optimization")
+            
+        elif action_type == "Reroute":
+            route_index = action_data.get('route_index', 0)
+            success = train.switch_to_alternative_route(route_index)
+            
+        elif action_type == "Cancel":
+            success = train.apply_cancellation("AI Optimization")
+            
+        elif action_type == "SpeedAdjust":
+            speed_factor = action_data.get('speed_factor', 1.0)
+            success = train.apply_speed_adjustment(speed_factor, "AI Optimization")
+            
+        else:
+            print(f"ERROR: Unknown action type: {action_type}")
+            return False
+        
+        if success:
+            print(f"✅ ACTION APPLIED: {action_type} successfully applied to {train.get_name()}")
+        else:
+            print(f"❌ ACTION FAILED: Could not apply {action_type} to {train.get_name()}")
+            
+        return success
+
+    def save_current_schedule(self, filename: str = "modified_schedule.json") -> bool:
+        """
+        Save the current network state as a schedule file.
+        This creates a new schedule reflecting all applied actions.
+        """
+        try:
+            import json
+            
+            # Convert current network state to schedule format
+            schedule_data = []
+            
+            for train in self.trains.values():
+                train_entry = {
+                    "train_id": train.id,
+                    "train_name": train.get_name(),
+                    "train_type": train.train_type,
+                    "priority": train.priority,
+                    "section_start": train.section_start,
+                    "section_end": train.section_end,
+                    "scheduled_departure": train.scheduled_departure_time,
+                    "scheduled_arrival": train.scheduled_arrival_time,
+                    "current_delay_mins": train.actual_delay_mins,
+                    "status": train.status,
+                    "weather": train.weather,
+                    "track_condition": train.track_condition,
+                    "day_of_week": train.day_of_week,
+                    "time_of_day": train.time_of_day,
+                    "current_location": train.current_location
+                }
+                
+                # Add route information if available
+                if train.current_route:
+                    train_entry["current_route"] = {
+                        "route_type": train.current_route.route_type,
+                        "stations": train.current_route.stations,
+                        "total_time_minutes": train.current_route.total_time_minutes,
+                        "total_distance_km": train.current_route.total_distance_km
+                    }
+                
+                schedule_data.append(train_entry)
+            
+            # Save to file
+            with open(filename, 'w') as f:
+                json.dump(schedule_data, f, indent=2)
+            
+            print(f"💾 SCHEDULE SAVED: Current network state saved to {filename}")
+            print(f"   {len(schedule_data)} trains included in schedule")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ ERROR SAVING SCHEDULE: {str(e)}")
+            return False
     
     def _handle_track_failure_event(self, event_data: Dict) -> bool:
         """Handle track failure events that affect the entire network."""

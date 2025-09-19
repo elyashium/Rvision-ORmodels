@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Network } from 'vis-network/standalone/esm/vis-network';
-import { DataSet } from 'vis-data/esmjs';
+import { Network } from 'vis-network';
+import { DataSet } from 'vis-data';
 import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 
 const NetworkGraph = ({ networkState, isSimulationRunning }) => {

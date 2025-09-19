@@ -575,50 +575,74 @@ export const useTrainSimulation = () => {
     try {
       // Stop current simulation
       setIsRunning(false);
-      setSimulationTime(new Date());
       
-      // Convert legacy train format to simulation format if needed
-      if (strategySimulationData.trains) {
-        const convertedTrains = Object.values(strategySimulationData.trains).map(train => ({
-          Train_ID: train.train_id,
-          Train_Type: train.train_type || 'Express',
-          Train_Name: train.train_name || train.train_id,
-          route: [{
-            Station_ID: train.section_start,
-            Station_Name: train.section_start,
-            Arrival_Time: train.scheduled_departure || '00:00:00',
-            Departure_Time: train.scheduled_departure || '00:00:00',
-            Platform: '1'
-          }, {
-            Station_ID: train.section_end,
-            Station_Name: train.section_end,
-            Arrival_Time: train.scheduled_arrival || '23:59:59',
-            Departure_Time: train.scheduled_arrival || '23:59:59',
-            Platform: '1'
-          }],
-          status: train.status || 'On Time',
-          current_delay_mins: train.current_delay_mins || 0,
-          // Set initial position to start station  
-          currentPosition: { x: 0, y: 0 },
-          hasStarted: false,
-          hasCompleted: false,
-          progressPercentage: 0
-        }));
-        
-        if (networkData) {
-          const processedTrains = preprocessTrainData(convertedTrains, networkData);
-          setTrains(processedTrains);
-          console.log('Strategy simulation loaded:', processedTrains.length, 'trains');
-          return { trains: processedTrains };
+      let scheduleData = [];
+      
+      // Handle different data formats
+      if (Array.isArray(strategySimulationData)) {
+        // Direct schedule array format (new backend format)
+        scheduleData = strategySimulationData;
+      } else if (strategySimulationData.trains) {
+        // Legacy network state format
+        if (Array.isArray(strategySimulationData.trains)) {
+          scheduleData = strategySimulationData.trains;
+        } else {
+          // Convert object format to array
+          scheduleData = Object.values(strategySimulationData.trains).map(train => ({
+            Train_ID: train.train_id || train.Train_ID,
+            Train_Type: train.train_type || train.Train_Type || 'Express',
+            Train_Name: train.train_name || train.Train_Name || train.train_id || train.Train_ID,
+            Route: train.Route || [{
+              Station_ID: train.section_start,
+              Station_Name: train.section_start,
+              Arrival_Time: train.scheduled_departure || '06:00:00',
+              Departure_Time: train.scheduled_departure || '06:00:00',
+              Platform: '1'
+            }, {
+              Station_ID: train.section_end,
+              Station_Name: train.section_end,
+              Arrival_Time: train.scheduled_arrival || '08:00:00',
+              Departure_Time: train.scheduled_arrival || '08:00:00',
+              Platform: '1'
+            }],
+            status: train.status || 'On Time',
+            current_delay_mins: train.current_delay_mins || 0
+          }));
         }
+      } else {
+        console.warn('Unknown strategy simulation data format:', strategySimulationData);
+        return { trains: [] };
       }
       
+      console.log('Processing strategy schedule data:', scheduleData.length, 'trains');
+      
+      if (scheduleData.length > 0 && networkData) {
+        // Store the raw schedule data for the simulation
+        setRawScheduleData(scheduleData);
+        
+        // Process the schedule data using the standard preprocessing
+        const processedTrains = preprocessTrainData(scheduleData, networkData);
+        setTrains(processedTrains);
+        
+        // Set simulation time to earliest departure
+        const earliestTime = findEarliestDepartureTime(scheduleData);
+        setSimulationTime(earliestTime);
+        
+        console.log('Strategy simulation loaded successfully:');
+        console.log('  - Trains:', processedTrains.length);
+        console.log('  - Start time:', earliestTime);
+        console.log('  - Sample train:', processedTrains[0]?.Train_ID);
+        
+        return { trains: processedTrains };
+      }
+      
+      console.warn('No valid schedule data or network data available');
       return { trains: [] };
     } catch (error) {
       console.error('Failed to load strategy simulation:', error);
       throw error;
     }
-  }, [preprocessTrainData, networkData]);
+  }, [preprocessTrainData, networkData, findEarliestDepartureTime]);
 
   return {
     // State

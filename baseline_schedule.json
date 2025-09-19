@@ -1,160 +1,164 @@
 [
   {
-    "train_id": "12001_SHATABDI",
-    "train_name": "Express 12001_SHATABDI",
-    "train_type": "Express",
-    "priority": 1,
-    "section_start": "NDLS",
-    "section_end": "GZB",
-    "scheduled_departure": "2024-10-26 08:00:00",
-    "scheduled_arrival": "2024-10-26 08:55:00",
-    "current_delay_mins": 325,
+    "Train_ID": "12001_SHATABDI",
+    "Train_Type": "Express",
+    "Train_Name": "Express 12001_SHATABDI",
+    "Route": [
+      {
+        "Station_ID": "NDLS",
+        "Station_Name": "NDLS",
+        "Arrival_Time": "06:00:00",
+        "Departure_Time": "06:00:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "GZB",
+        "Arrival_Time": "08:00:00",
+        "Departure_Time": "08:00:00",
+        "Platform": "1"
+      }
+    ],
     "status": "Delayed ()",
+    "current_delay_mins": 625,
     "weather": "Clear",
     "track_condition": "Normal",
     "day_of_week": "Monday",
-    "time_of_day": "Morning_Peak",
-    "current_location": "NDLS",
-    "current_route": {
-      "route_type": "primary",
-      "stations": [
-        "NDLS",
-        "ANVR",
-        "GZB"
-      ],
-      "total_time_minutes": 55,
-      "total_distance_km": 33.9
-    }
+    "time_of_day": "Morning_Peak"
   },
   {
-    "train_id": "15005_PASSENGER",
-    "train_name": "Passenger 15005_PASSENGER",
-    "train_type": "Passenger",
-    "priority": 2,
-    "section_start": "GZB",
-    "section_end": "MUT",
-    "scheduled_departure": "2024-10-26 09:15:00",
-    "scheduled_arrival": "2024-10-26 10:45:00",
+    "Train_ID": "15005_PASSENGER",
+    "Train_Type": "Passenger",
+    "Train_Name": "Passenger 15005_PASSENGER",
+    "Route": [
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "GZB",
+        "Arrival_Time": "06:00:00",
+        "Departure_Time": "06:00:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "MUT",
+        "Station_Name": "MUT",
+        "Arrival_Time": "08:00:00",
+        "Departure_Time": "08:00:00",
+        "Platform": "1"
+      }
+    ],
+    "status": "On-Time",
     "current_delay_mins": 0,
-    "status": "On-Time",
     "weather": "Clear",
     "track_condition": "Normal",
     "day_of_week": "Monday",
-    "time_of_day": "Morning_Peak",
-    "current_location": "GZB",
-    "current_route": {
-      "route_type": "primary",
-      "stations": [
-        "GZB",
-        "MUT"
-      ],
-      "total_time_minutes": 60,
-      "total_distance_km": 45.2
-    }
+    "time_of_day": "Morning_Peak"
   },
   {
-    "train_id": "18205_GOODS",
-    "train_name": "Goods 18205_GOODS",
-    "train_type": "Goods",
-    "priority": 5,
-    "section_start": "ANVR",
-    "section_end": "GZB",
-    "scheduled_departure": "2024-10-26 10:30:00",
-    "scheduled_arrival": "2024-10-26 11:15:00",
-    "current_delay_mins": 15,
+    "Train_ID": "18205_GOODS",
+    "Train_Type": "Goods",
+    "Train_Name": "Goods 18205_GOODS",
+    "Route": [
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "ANVR",
+        "Arrival_Time": "06:00:00",
+        "Departure_Time": "06:00:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "GZB",
+        "Arrival_Time": "08:00:00",
+        "Departure_Time": "08:00:00",
+        "Platform": "1"
+      }
+    ],
     "status": "On-Time",
+    "current_delay_mins": 15,
     "weather": "Rain",
     "track_condition": "Normal",
     "day_of_week": "Monday",
-    "time_of_day": "Off_Peak",
-    "current_location": "ANVR",
-    "current_route": {
-      "route_type": "primary",
-      "stations": [
-        "ANVR",
-        "GZB"
-      ],
-      "total_time_minutes": 30,
-      "total_distance_km": 18.7
-    }
+    "time_of_day": "Off_Peak"
   },
   {
-    "train_id": "22301_RAJDHANI",
-    "train_name": "Express 22301_RAJDHANI",
-    "train_type": "Express",
-    "priority": 1,
-    "section_start": "GZB",
-    "section_end": "NDLS",
-    "scheduled_departure": "2024-10-26 14:20:00",
-    "scheduled_arrival": "2024-10-26 14:50:00",
-    "current_delay_mins": 0,
+    "Train_ID": "22301_RAJDHANI",
+    "Train_Type": "Express",
+    "Train_Name": "Express 22301_RAJDHANI",
+    "Route": [
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "GZB",
+        "Arrival_Time": "06:00:00",
+        "Departure_Time": "06:00:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "NDLS",
+        "Station_Name": "NDLS",
+        "Arrival_Time": "08:00:00",
+        "Departure_Time": "08:00:00",
+        "Platform": "1"
+      }
+    ],
     "status": "On-Time",
+    "current_delay_mins": 0,
     "weather": "Clear",
     "track_condition": "Normal",
     "day_of_week": "Monday",
-    "time_of_day": "Afternoon",
-    "current_location": "GZB",
-    "current_route": {
-      "route_type": "primary",
-      "stations": [
-        "GZB",
-        "ANVR",
-        "NDLS"
-      ],
-      "total_time_minutes": 55,
-      "total_distance_km": 33.9
-    }
+    "time_of_day": "Afternoon"
   },
   {
-    "train_id": "14005_LOCAL",
-    "train_name": "Local 14005_LOCAL",
-    "train_type": "Local",
-    "priority": 3,
-    "section_start": "ANVR",
-    "section_end": "GZB",
-    "scheduled_departure": "2024-10-26 17:30:00",
-    "scheduled_arrival": "2024-10-26 18:00:00",
-    "current_delay_mins": 0,
+    "Train_ID": "14005_LOCAL",
+    "Train_Type": "Local",
+    "Train_Name": "Local 14005_LOCAL",
+    "Route": [
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "ANVR",
+        "Arrival_Time": "06:00:00",
+        "Departure_Time": "06:00:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "GZB",
+        "Arrival_Time": "08:00:00",
+        "Departure_Time": "08:00:00",
+        "Platform": "1"
+      }
+    ],
     "status": "On-Time",
+    "current_delay_mins": 0,
     "weather": "Fog",
     "track_condition": "Maintenance",
     "day_of_week": "Monday",
-    "time_of_day": "Evening_Peak",
-    "current_location": "ANVR",
-    "current_route": {
-      "route_type": "primary",
-      "stations": [
-        "ANVR",
-        "GZB"
-      ],
-      "total_time_minutes": 30,
-      "total_distance_km": 18.7
-    }
+    "time_of_day": "Evening_Peak"
   },
   {
-    "train_id": "16005_EXPRESS",
-    "train_name": "Express 16005_EXPRESS",
-    "train_type": "Express",
-    "priority": 1,
-    "section_start": "GZB",
-    "section_end": "ANVR",
-    "scheduled_departure": "2024-10-26 19:45:00",
-    "scheduled_arrival": "2024-10-26 20:15:00",
-    "current_delay_mins": 10,
+    "Train_ID": "16005_EXPRESS",
+    "Train_Type": "Express",
+    "Train_Name": "Express 16005_EXPRESS",
+    "Route": [
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "GZB",
+        "Arrival_Time": "06:00:00",
+        "Departure_Time": "06:00:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "ANVR",
+        "Arrival_Time": "08:00:00",
+        "Departure_Time": "08:00:00",
+        "Platform": "1"
+      }
+    ],
     "status": "On-Time",
+    "current_delay_mins": 10,
     "weather": "Clear",
     "track_condition": "Normal",
     "day_of_week": "Monday",
-    "time_of_day": "Evening_Peak",
-    "current_location": "GZB",
-    "current_route": {
-      "route_type": "primary",
-      "stations": [
-        "GZB",
-        "ANVR"
-      ],
-      "total_time_minutes": 30,
-      "total_distance_km": 18.7
-    }
+    "time_of_day": "Evening_Peak"
   }
 ]

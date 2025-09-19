@@ -675,25 +675,48 @@ class MultiStrategyOptimizer:
                 filename = f"strategy_{strategy_key}_schedule.json"
                 strategy_network.save_current_schedule(filename)
                 
-                # Get the modified network state
-                strategy_state = strategy_network.get_state_snapshot()
-                
-                # Add the schedule data to the strategy result
-                strategy_result["schedule_data"] = strategy_state
-                strategy_result["schedule_file"] = filename
-                strategy_result["applied_action"] = action
+                # Read the saved schedule file to get the simulation-ready data
+                import json
+                try:
+                    with open(filename, 'r') as f:
+                        schedule_data = json.load(f)
+                    
+                    # Add the schedule data to the strategy result
+                    strategy_result["schedule_data"] = schedule_data  # Direct schedule array
+                    strategy_result["schedule_file"] = filename
+                    strategy_result["applied_action"] = action
+                except Exception as e:
+                    print(f"   ⚠️ Could not load schedule file {filename}: {e}")
+                    # Fallback to network state
+                    strategy_state = strategy_network.get_state_snapshot()
+                    strategy_result["schedule_data"] = strategy_state
+                    strategy_result["schedule_file"] = filename
+                    strategy_result["applied_action"] = action
                 
                 print(f"   ✅ {strategy_key} schedule generated: {filename}")
                 
             else:
                 # No action needed - use baseline schedule
-                baseline_state = strategy_network.get_state_snapshot()
-                strategy_result["schedule_data"] = baseline_state
-                strategy_result["schedule_file"] = "baseline_schedule.json"
-                strategy_result["applied_action"] = None
+                filename = "baseline_schedule.json"
+                strategy_network.save_current_schedule(filename)
                 
-                # Save baseline schedule
-                strategy_network.save_current_schedule("baseline_schedule.json")
+                # Read the saved schedule file
+                import json
+                try:
+                    with open(filename, 'r') as f:
+                        schedule_data = json.load(f)
+                    
+                    strategy_result["schedule_data"] = schedule_data  # Direct schedule array
+                    strategy_result["schedule_file"] = filename
+                    strategy_result["applied_action"] = None
+                except Exception as e:
+                    print(f"   ⚠️ Could not load baseline schedule file: {e}")
+                    # Fallback to network state
+                    baseline_state = strategy_network.get_state_snapshot()
+                    strategy_result["schedule_data"] = baseline_state
+                    strategy_result["schedule_file"] = filename
+                    strategy_result["applied_action"] = None
+                
                 print(f"   ✅ {strategy_key} using baseline schedule")
         
         print("📋 ALL STRATEGY SCHEDULES GENERATED")

@@ -129,13 +129,16 @@ function App() {
   const handleDisruptionReported = (eventData, optimizationResult, simulations) => {
     console.log('App: handleDisruptionReported called with:', { eventData, optimizationResult, simulations });
     
-    addAlert('warning', `Disruption reported: ${eventData.train_id}`, `${eventData.delay_minutes} minute delay`);
+    // Clear previous alerts to avoid clutter
+    setAlerts([]);
+    
+    addAlert('warning', `Disruption: ${eventData.train_id}`, `${eventData.delay_minutes}min delay reported`);
     
     // Handle multi-strategy simulations
     if (simulations && Object.keys(simulations).length > 0) {
       console.log('App: Setting multi-strategy simulations:', simulations);
       setMultiStrategySimulations(simulations);
-      addAlert('info', 'Multi-strategy analysis completed', `${Object.keys(simulations).length} optimization strategies evaluated`);
+      addAlert('success', 'AI Analysis Complete', `${Object.keys(simulations).length} optimization strategies ready`);
     } 
     // Fallback to legacy single recommendation
     else if (optimizationResult && optimizationResult.recommendation) {
@@ -178,18 +181,17 @@ function App() {
 
   const handleRunSimulation = async (strategyData) => {
     try {
-      addAlert('info', `Running ${strategyData.strategyName} simulation`, 
-        'Loading strategy-specific schedule data...');
+      // Clear previous alerts to reduce clutter
+      setAlerts([]); 
+      
+      addAlert('info', `Starting ${strategyData.strategyName}`, 'Loading...');
       
       // Check if the strategy data includes schedule_data from the backend
       if (strategyData.schedule_data) {
         console.log('Using strategy schedule data from backend:', strategyData.schedule_data);
         
-        // Use the schedule data that was pre-calculated by the backend
-        setNetworkState(strategyData.schedule_data);
-        
         // Load the strategy simulation data into the live simulation
-        if (strategyData.schedule_data.trains && strategyData.schedule_data.trains.length > 0) {
+        if (Array.isArray(strategyData.schedule_data) && strategyData.schedule_data.length > 0) {
           try {
             const simulationResult = loadStrategySimulation(strategyData.schedule_data);
             
@@ -198,22 +200,41 @@ function App() {
               startLiveSimulation();
               
               const actionText = strategyData.applied_action 
-                ? `with ${strategyData.applied_action.action_type} applied to ${strategyData.applied_action.train_id}`
-                : 'with baseline schedule';
+                ? `${strategyData.applied_action.action_type} applied`
+                : 'baseline schedule';
               
-              addAlert('success', `${strategyData.strategyName} simulation started`, 
-                `Showing ${simulationResult.trains.length} trains ${actionText}`);
+              addAlert('success', `${strategyData.strategyName} Running`, 
+                `${simulationResult.trains.length} trains - ${actionText}`);
             } else {
-              addAlert('warning', 'No trains loaded for simulation', 
-                'Unable to start simulation with strategy data');
+              addAlert('warning', 'No trains loaded', 'Strategy data issue');
             }
           } catch (loadError) {
             console.error('Failed to load strategy simulation:', loadError);
-            addAlert('error', 'Failed to load simulation data', loadError.message);
+            addAlert('error', 'Simulation error', loadError.message);
+          }
+        } else if (strategyData.schedule_data.trains) {
+          // Handle legacy format
+          try {
+            const simulationResult = loadStrategySimulation(strategyData.schedule_data);
+            
+            if (simulationResult && simulationResult.trains.length > 0) {
+              startLiveSimulation();
+              
+              const actionText = strategyData.applied_action 
+                ? `${strategyData.applied_action.action_type} applied`
+                : 'baseline schedule';
+              
+              addAlert('success', `${strategyData.strategyName} Running`, 
+                `${simulationResult.trains.length} trains - ${actionText}`);
+            } else {
+              addAlert('warning', 'No trains loaded', 'Strategy data issue');
+            }
+          } catch (loadError) {
+            console.error('Failed to load strategy simulation:', loadError);
+            addAlert('error', 'Simulation error', loadError.message);
           }
         } else {
-          addAlert('warning', 'No train data in strategy', 
-            'Strategy schedule does not contain train information');
+          addAlert('warning', 'No train data', 'Strategy incomplete');
         }
       } else {
         // Fallback to old method if schedule_data is not available

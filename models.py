@@ -381,42 +381,116 @@ class RailwayNetwork:
 
     def save_current_schedule(self, filename: str = "modified_schedule.json") -> bool:
         """
-        Save the current network state as a schedule file.
+        Save the current network state as a schedule file in frontend-compatible format.
         This creates a new schedule reflecting all applied actions.
         """
         try:
             import json
+            from datetime import datetime, timedelta
             
-            # Convert current network state to schedule format
+            # Convert current network state to frontend simulation format
             schedule_data = []
             
             for train in self.trains.values():
+                # Calculate adjusted departure/arrival times based on delays
+                try:
+                    base_departure = datetime.strptime(train.scheduled_departure_time, "%H:%M:%S")
+                    base_arrival = datetime.strptime(train.scheduled_arrival_time, "%H:%M:%S")
+                    
+                    # Apply delays
+                    actual_departure = base_departure + timedelta(minutes=train.actual_delay_mins)
+                    actual_arrival = base_arrival + timedelta(minutes=train.actual_delay_mins)
+                    
+                    # Create route array with adjusted times
+                    route = []
+                    
+                    # Add intermediate stations if available from current route
+                    if train.current_route and hasattr(train.current_route, 'stations') and len(train.current_route.stations) > 2:
+                        stations = train.current_route.stations
+                        total_journey_time = (actual_arrival - actual_departure).total_seconds() / 60  # minutes
+                        
+                        for i, station in enumerate(stations):
+                            if i == 0:
+                                # Origin station
+                                route.append({
+                                    "Station_ID": station,
+                                    "Station_Name": station,
+                                    "Arrival_Time": actual_departure.strftime("%H:%M:%S"),
+                                    "Departure_Time": actual_departure.strftime("%H:%M:%S"),
+                                    "Platform": "1"
+                                })
+                            elif i == len(stations) - 1:
+                                # Destination station
+                                route.append({
+                                    "Station_ID": station,
+                                    "Station_Name": station,
+                                    "Arrival_Time": actual_arrival.strftime("%H:%M:%S"),
+                                    "Departure_Time": actual_arrival.strftime("%H:%M:%S"),
+                                    "Platform": "1"
+                                })
+                            else:
+                                # Intermediate station - calculate proportional time
+                                proportion = i / (len(stations) - 1)
+                                station_time = actual_departure + timedelta(minutes=total_journey_time * proportion)
+                                
+                                route.append({
+                                    "Station_ID": station,
+                                    "Station_Name": station,
+                                    "Arrival_Time": station_time.strftime("%H:%M:%S"),
+                                    "Departure_Time": (station_time + timedelta(minutes=2)).strftime("%H:%M:%S"),  # 2 min stop
+                                    "Platform": "1"
+                                })
+                    else:
+                        # Simple 2-station route
+                        route = [
+                            {
+                                "Station_ID": train.section_start,
+                                "Station_Name": train.section_start,
+                                "Arrival_Time": actual_departure.strftime("%H:%M:%S"),
+                                "Departure_Time": actual_departure.strftime("%H:%M:%S"),
+                                "Platform": "1"
+                            },
+                            {
+                                "Station_ID": train.section_end,
+                                "Station_Name": train.section_end,
+                                "Arrival_Time": actual_arrival.strftime("%H:%M:%S"),
+                                "Departure_Time": actual_arrival.strftime("%H:%M:%S"),
+                                "Platform": "1"
+                            }
+                        ]
+                    
+                except ValueError:
+                    # Fallback for invalid time formats
+                    route = [
+                        {
+                            "Station_ID": train.section_start,
+                            "Station_Name": train.section_start,
+                            "Arrival_Time": "06:00:00",
+                            "Departure_Time": "06:00:00",
+                            "Platform": "1"
+                        },
+                        {
+                            "Station_ID": train.section_end,
+                            "Station_Name": train.section_end,
+                            "Arrival_Time": "08:00:00",
+                            "Departure_Time": "08:00:00",
+                            "Platform": "1"
+                        }
+                    ]
+                
+                # Create train entry in frontend simulation format
                 train_entry = {
-                    "train_id": train.id,
-                    "train_name": train.get_name(),
-                    "train_type": train.train_type,
-                    "priority": train.priority,
-                    "section_start": train.section_start,
-                    "section_end": train.section_end,
-                    "scheduled_departure": train.scheduled_departure_time,
-                    "scheduled_arrival": train.scheduled_arrival_time,
-                    "current_delay_mins": train.actual_delay_mins,
+                    "Train_ID": train.id,
+                    "Train_Type": train.train_type,
+                    "Train_Name": train.get_name(),
+                    "Route": route,
                     "status": train.status,
+                    "current_delay_mins": train.actual_delay_mins,
                     "weather": train.weather,
                     "track_condition": train.track_condition,
                     "day_of_week": train.day_of_week,
-                    "time_of_day": train.time_of_day,
-                    "current_location": train.current_location
+                    "time_of_day": train.time_of_day
                 }
-                
-                # Add route information if available
-                if train.current_route:
-                    train_entry["current_route"] = {
-                        "route_type": train.current_route.route_type,
-                        "stations": train.current_route.stations,
-                        "total_time_minutes": train.current_route.total_time_minutes,
-                        "total_distance_km": train.current_route.total_distance_km
-                    }
                 
                 schedule_data.append(train_entry)
             

@@ -3,6 +3,7 @@ import { Train, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
 import ControlPanel from './components/ControlPanel';
 import NetworkGraph from './components/NetworkGraph';
 import AlertsAndRecommendations from './components/AlertsAndRecommendations';
+import SimulationClock from './components/SimulationClock';
 import { apiService } from './services/apiService';
 import { useTrainSimulation } from './hooks/useTrainSimulation';
 import './App.css';
@@ -246,18 +247,34 @@ function App() {
               />
             </div>
 
-            {/* Right Panel - Alerts and Recommendations */}
-            <div className="w-72 flex-shrink-0">
-              <AlertsAndRecommendations
-                alerts={alerts}
-                recommendations={recommendations}
-                onAcceptRecommendation={(recommendation) => {
-                  addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
-                }}
-                onRejectRecommendation={(recommendation) => {
-                  addAlert('info', 'Recommendation rejected', 'Manual override applied');
-                }}
-              />
+            {/* Right Panel - Clock and Alerts */}
+            <div className="w-72 flex-shrink-0 flex flex-col space-y-3">
+              {/* Simulation Clock - Only show when live simulation is available */}
+              {simulationTrains.length > 0 && (
+                <SimulationClock
+                  simulationTime={simulationTime}
+                  simulationSpeed={simulationSpeed}
+                  isRunning={isLiveSimulationRunning}
+                  onSpeedChange={setSimulationSpeed}
+                  onTogglePlayPause={isLiveSimulationRunning ? handleSimulationStop : handleSimulationStart}
+                  onReset={resetSimulation}
+                  trainsCount={simulationTrains.length}
+                />
+              )}
+              
+              {/* Alerts and Recommendations */}
+              <div className="flex-1 min-h-0">
+                <AlertsAndRecommendations
+                  alerts={alerts}
+                  recommendations={recommendations}
+                  onAcceptRecommendation={(recommendation) => {
+                    addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
+                  }}
+                  onRejectRecommendation={(recommendation) => {
+                    addAlert('info', 'Recommendation rejected', 'Manual override applied');
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -289,16 +306,31 @@ function App() {
               />
             }
             rightPanelContent={
-              <AlertsAndRecommendations
-                alerts={alerts}
-                recommendations={recommendations}
-                onAcceptRecommendation={(recommendation) => {
-                  addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
-                }}
-                onRejectRecommendation={(recommendation) => {
-                  addAlert('info', 'Recommendation rejected', 'Manual override applied');
-                }}
-              />
+              <div className="space-y-4">
+                {/* Simulation Clock in fullscreen mode */}
+                {simulationTrains.length > 0 && (
+                  <SimulationClock
+                    simulationTime={simulationTime}
+                    simulationSpeed={simulationSpeed}
+                    isRunning={isLiveSimulationRunning}
+                    onSpeedChange={setSimulationSpeed}
+                    onTogglePlayPause={isLiveSimulationRunning ? handleSimulationStop : handleSimulationStart}
+                    onReset={resetSimulation}
+                    trainsCount={simulationTrains.length}
+                  />
+                )}
+                
+                <AlertsAndRecommendations
+                  alerts={alerts}
+                  recommendations={recommendations}
+                  onAcceptRecommendation={(recommendation) => {
+                    addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
+                  }}
+                  onRejectRecommendation={(recommendation) => {
+                    addAlert('info', 'Recommendation rejected', 'Manual override applied');
+                  }}
+                />
+              </div>
             }
           />
         </div>

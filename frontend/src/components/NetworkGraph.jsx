@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Network } from 'vis-network';
 import { DataSet } from 'vis-data';
-import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut, X } from 'lucide-react';
+import JourneyProgress from './JourneyProgress';
 
 const NetworkGraph = ({ 
   networkState, 
@@ -21,6 +22,7 @@ const NetworkGraph = ({
   const [showLeftPanel, setShowLeftPanel] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [trainNodes, setTrainNodes] = useState(new DataSet());
+  const [selectedTrain, setSelectedTrain] = useState(null);
 
   // Network graph data (stations and tracks) - loaded from your network_graph.json structure
   const getNetworkData = () => {
@@ -113,11 +115,11 @@ const NetworkGraph = ({
       nodes.remove(existingTrainIds);
     }
 
-    // Add updated train nodes
+    // Add updated train nodes with emoji representation
     const trainNodesToAdd = simulationTrains.map(train => {
       const trainId = `train_${train.Train_ID}`;
       
-      // Get status-based color
+      // Get status-based color for train emoji background
       const getTrainColor = (status) => {
         switch (status) {
           case 'Scheduled':
@@ -126,6 +128,8 @@ const NetworkGraph = ({
             return { background: '#28a745', border: '#198754' }; // Green
           case 'Delayed':
             return { background: '#ffc107', border: '#e0a800' }; // Orange
+          case 'Stopped':
+            return { background: '#17a2b8', border: '#138496' }; // Blue-cyan for stopped at station
           case 'Arrived':
             return { background: '#007bff', border: '#0056b3' }; // Blue
           default:
@@ -133,18 +137,61 @@ const NetworkGraph = ({
         }
       };
 
+      // Create detailed tooltip with journey information
+      const createTooltip = () => {
+        let tooltip = `🚆 ${train.Train_ID}\n`;
+        tooltip += `Type: ${train.Train_Type}\n`;
+        tooltip += `Status: ${train.currentStatus}\n`;
+        
+        if (train.stationInfo) {
+          tooltip += `Location: ${train.stationInfo}\n`;
+        }
+        
+        if (train.route && train.route.length > 0) {
+          const origin = train.route[0];
+          const destination = train.route[train.route.length - 1];
+          tooltip += `Journey: ${origin.Station_Name} → ${destination.Station_Name}\n`;
+          
+          if (train.currentStop && train.nextStop) {
+            tooltip += `Current Leg: ${train.currentStop.Station_Name} → ${train.nextStop.Station_Name}\n`;
+          }
+          
+          if (train.progressPercentage) {
+            tooltip += `Progress: ${Math.round(train.progressPercentage * 100)}%\n`;
+          }
+        }
+        
+        if (train.Initial_Reported_Delay_Mins > 0) {
+          tooltip += `Delay: ${train.Initial_Reported_Delay_Mins}min`;
+        }
+        
+        return tooltip;
+      };
+
       return {
         id: trainId,
-        label: train.Train_ID.split('_')[0],
+        label: '🚆', // Train emoji as the visual representation
         x: train.currentPosition.x,
         y: train.currentPosition.y,
         group: 'train',
         color: getTrainColor(train.currentStatus),
-        title: `${train.Train_ID}\nType: ${train.Train_Type}\nStatus: ${train.currentStatus}\nRoute: ${train.Section_Start} → ${train.Section_End}\nDelay: ${train.Initial_Reported_Delay_Mins || 0}min`,
+        title: createTooltip(),
         physics: false,
-        shape: 'triangle',
-        size: 12,
-        font: { size: 8, color: '#ffffff' }
+        shape: 'circle',
+        size: 16, // Larger size to accommodate emoji
+        font: { 
+          size: 14, 
+          color: 'white',
+          face: 'monospace' // Better emoji rendering
+        },
+        borderWidth: 2,
+        shadow: {
+          enabled: true,
+          color: 'rgba(0,0,0,0.3)',
+          size: 3,
+          x: 1,
+          y: 1
+        }
       };
     });
 
@@ -315,6 +362,22 @@ const NetworkGraph = ({
           if (params.nodes.length > 0) {
             const nodeId = params.nodes[0];
             console.log('Clicked node:', nodeId);
+            
+            // Check if clicked node is a train
+            if (nodeId.startsWith('train_')) {
+              const trainId = nodeId.replace('train_', '');
+              const train = simulationTrains.find(t => t.Train_ID === trainId);
+              if (train) {
+                setSelectedTrain(train);
+                console.log('Selected train:', train);
+              }
+            } else {
+              // Clicked on a station or other node - close train details
+              setSelectedTrain(null);
+            }
+          } else {
+            // Clicked on empty space - close train details
+            setSelectedTrain(null);
           }
         });
 
@@ -634,6 +697,22 @@ const NetworkGraph = ({
         }`}>
           <div className="h-full overflow-y-auto p-4">
             {rightPanelContent}
+          </div>
+        </div>
+      )}
+
+      {/* Train Journey Progress Overlay */}
+      {selectedTrain && (
+        <div className="absolute bottom-4 left-4 w-80 z-40">
+          <div className="relative">
+            <button
+              onClick={() => setSelectedTrain(null)}
+              className="absolute -top-2 -right-2 w-6 h-6 bg-rail-danger text-white rounded-full flex items-center justify-center text-xs hover:bg-rail-danger/90 transition-colors z-50"
+              title="Close"
+            >
+              <X className="w-3 h-3" />
+            </button>
+            <JourneyProgress train={selectedTrain} />
           </div>
         </div>
       )}

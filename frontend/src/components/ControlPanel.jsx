@@ -105,12 +105,13 @@ const ControlPanel = ({
 
   return (
     <div className="rail-card p-4 h-full flex flex-col">
-      <div className="flex items-center space-x-2 mb-4">
+      <div className="flex items-center space-x-2 mb-4 flex-shrink-0">
         <Settings className="w-4 h-4 text-rail-text" />
         <h2 className="text-sm font-semibold text-rail-text">Control Panel</h2>
       </div>
 
-      <div className="space-y-4 flex-1">
+      {/* Scrollable Content Container */}
+      <div className="flex-1 overflow-y-auto pr-2 space-y-4" style={{ maxHeight: 'calc(100vh - 180px)' }}>
         {/* Schedule Upload Section */}
         <div className="space-y-2">
           <h3 className="text-xs font-medium text-rail-text-secondary uppercase tracking-wide">

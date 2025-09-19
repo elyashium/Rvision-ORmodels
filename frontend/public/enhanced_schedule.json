@@ -1,0 +1,234 @@
+[
+  {
+    "Train_ID": "12001_SHATABDI",
+    "Train_Type": "Express",
+    "Day_of_Week": "Monday",
+    "Time_of_Day": "Morning_Peak",
+    "Weather": "Clear",
+    "Track_Condition": "Normal",
+    "Initial_Reported_Delay_Mins": 5,
+    "Actual_Delay_Mins": 25,
+    "Route": [
+      {
+        "Station_ID": "NDLS",
+        "Station_Name": "New Delhi Station",
+        "Arrival_Time": null,
+        "Departure_Time": "2024-10-26 08:00:00",
+        "Stop_Duration_Mins": 0,
+        "Platform": "5"
+      },
+      {
+        "Station_ID": "SHZM",
+        "Station_Name": "Shaheed Nagar",
+        "Arrival_Time": "2024-10-26 08:08:00",
+        "Departure_Time": "2024-10-26 08:10:00",
+        "Stop_Duration_Mins": 2,
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "Anand Vihar Terminal",
+        "Arrival_Time": "2024-10-26 08:25:00",
+        "Departure_Time": "2024-10-26 08:30:00",
+        "Stop_Duration_Mins": 5,
+        "Platform": "3"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "Ghaziabad Junction",
+        "Arrival_Time": "2024-10-26 08:55:00",
+        "Departure_Time": null,
+        "Stop_Duration_Mins": 0,
+        "Platform": "2"
+      }
+    ]
+  },
+  {
+    "Train_ID": "15005_PASSENGER",
+    "Train_Type": "Passenger",
+    "Day_of_Week": "Monday",
+    "Time_of_Day": "Morning_Peak",
+    "Weather": "Clear",
+    "Track_Condition": "Normal",
+    "Initial_Reported_Delay_Mins": 0,
+    "Actual_Delay_Mins": 0,
+    "Route": [
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "Ghaziabad Junction",
+        "Arrival_Time": null,
+        "Departure_Time": "2024-10-26 09:15:00",
+        "Stop_Duration_Mins": 0,
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "SBB",
+        "Station_Name": "Sahibabad",
+        "Arrival_Time": "2024-10-26 09:35:00",
+        "Departure_Time": "2024-10-26 09:37:00",
+        "Stop_Duration_Mins": 2,
+        "Platform": "2"
+      },
+      {
+        "Station_ID": "MUT",
+        "Station_Name": "Meerut City",
+        "Arrival_Time": "2024-10-26 10:45:00",
+        "Departure_Time": null,
+        "Stop_Duration_Mins": 0,
+        "Platform": "4"
+      }
+    ]
+  },
+  {
+    "Train_ID": "18205_GOODS",
+    "Train_Type": "Goods",
+    "Day_of_Week": "Monday",
+    "Time_of_Day": "Off_Peak",
+    "Weather": "Rain",
+    "Track_Condition": "Normal",
+    "Initial_Reported_Delay_Mins": 15,
+    "Actual_Delay_Mins": 15,
+    "Route": [
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "Anand Vihar Terminal",
+        "Arrival_Time": null,
+        "Departure_Time": "2024-10-26 10:30:00",
+        "Stop_Duration_Mins": 0,
+        "Platform": "7"
+      },
+      {
+        "Station_ID": "VVB",
+        "Station_Name": "Vivek Vihar",
+        "Arrival_Time": "2024-10-26 10:48:00",
+        "Departure_Time": "2024-10-26 10:55:00",
+        "Stop_Duration_Mins": 7,
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "Ghaziabad Junction",
+        "Arrival_Time": "2024-10-26 11:15:00",
+        "Departure_Time": null,
+        "Stop_Duration_Mins": 0,
+        "Platform": "6"
+      }
+    ]
+  },
+  {
+    "Train_ID": "22301_RAJDHANI",
+    "Train_Type": "Express",
+    "Day_of_Week": "Monday",
+    "Time_of_Day": "Afternoon",
+    "Weather": "Clear",
+    "Track_Condition": "Normal",
+    "Initial_Reported_Delay_Mins": 0,
+    "Actual_Delay_Mins": 0,
+    "Route": [
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "Ghaziabad Junction",
+        "Arrival_Time": null,
+        "Departure_Time": "2024-10-26 14:20:00",
+        "Stop_Duration_Mins": 0,
+        "Platform": "3"
+      },
+      {
+        "Station_ID": "SBB",
+        "Station_Name": "Sahibabad",
+        "Arrival_Time": "2024-10-26 14:32:00",
+        "Departure_Time": "2024-10-26 14:33:00",
+        "Stop_Duration_Mins": 1,
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "Anand Vihar Terminal",
+        "Arrival_Time": "2024-10-26 14:45:00",
+        "Departure_Time": "2024-10-26 14:47:00",
+        "Stop_Duration_Mins": 2,
+        "Platform": "4"
+      },
+      {
+        "Station_ID": "NDLS",
+        "Station_Name": "New Delhi Station",
+        "Arrival_Time": "2024-10-26 14:50:00",
+        "Departure_Time": null,
+        "Stop_Duration_Mins": 0,
+        "Platform": "12"
+      }
+    ]
+  },
+  {
+    "Train_ID": "14005_LOCAL",
+    "Train_Type": "Local",
+    "Day_of_Week": "Monday",
+    "Time_of_Day": "Evening_Peak",
+    "Weather": "Fog",
+    "Track_Condition": "Maintenance",
+    "Initial_Reported_Delay_Mins": 0,
+    "Actual_Delay_Mins": 0,
+    "Route": [
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "Anand Vihar Terminal",
+        "Arrival_Time": null,
+        "Departure_Time": "2024-10-26 17:30:00",
+        "Stop_Duration_Mins": 0,
+        "Platform": "2"
+      },
+      {
+        "Station_ID": "VVB",
+        "Station_Name": "Vivek Vihar",
+        "Arrival_Time": "2024-10-26 17:42:00",
+        "Departure_Time": "2024-10-26 17:44:00",
+        "Stop_Duration_Mins": 2,
+        "Platform": "2"
+      },
+      {
+        "Station_ID": "SHZM",
+        "Station_Name": "Shaheed Nagar",
+        "Arrival_Time": "2024-10-26 17:52:00",
+        "Departure_Time": "2024-10-26 17:53:00",
+        "Stop_Duration_Mins": 1,
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "Ghaziabad Junction",
+        "Arrival_Time": "2024-10-26 18:00:00",
+        "Departure_Time": null,
+        "Stop_Duration_Mins": 0,
+        "Platform": "8"
+      }
+    ]
+  },
+  {
+    "Train_ID": "16005_EXPRESS",
+    "Train_Type": "Express",
+    "Day_of_Week": "Monday",
+    "Time_of_Day": "Evening_Peak",
+    "Weather": "Clear",
+    "Track_Condition": "Normal",
+    "Initial_Reported_Delay_Mins": 10,
+    "Actual_Delay_Mins": 10,
+    "Route": [
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "Ghaziabad Junction",
+        "Arrival_Time": null,
+        "Departure_Time": "2024-10-26 19:45:00",
+        "Stop_Duration_Mins": 0,
+        "Platform": "5"
+      },
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "Anand Vihar Terminal",
+        "Arrival_Time": "2024-10-26 20:15:00",
+        "Departure_Time": null,
+        "Stop_Duration_Mins": 0,
+        "Platform": "6"
+      }
+    ]
+  }
+]

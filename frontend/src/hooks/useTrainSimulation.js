@@ -10,11 +10,21 @@ export const useTrainSimulation = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [rawScheduleData, setRawScheduleData] = useState([]);
 
-  // Helper function to find the earliest departure time
+  // Helper function to find the earliest departure time (Enhanced for new format)
   const findEarliestDepartureTime = (scheduleData) => {
     if (!scheduleData || scheduleData.length === 0) return new Date();
     
-    const departureTimes = scheduleData.map(train => new Date(train.Scheduled_Departure_Time));
+    const departureTimes = scheduleData.map(train => {
+      if (train.Route && Array.isArray(train.Route) && train.Route.length > 0) {
+        // New format - get departure time from first route stop
+        const firstStop = train.Route[0];
+        return firstStop.Departure_Time ? new Date(firstStop.Departure_Time) : new Date();
+      } else {
+        // Legacy format
+        return new Date(train.Scheduled_Departure_Time);
+      }
+    });
+    
     return new Date(Math.min(...departureTimes));
   };
 
@@ -33,47 +43,104 @@ export const useTrainSimulation = () => {
     return null;
   };
 
-  // Step 2: Pre-processing function for train data
+  // Step 2: Pre-processing function for train data (Enhanced for multi-stop journeys)
   const preprocessTrainData = useCallback((scheduleData, networkData) => {
     if (!scheduleData || !networkData) return [];
 
     return scheduleData.map(trainData => {
+      // Handle both old and new schedule formats
+      let processedRoute = [];
+      
+      if (trainData.Route && Array.isArray(trainData.Route)) {
+        // New enhanced schedule format with multi-stop routes
+        processedRoute = trainData.Route.map((stop, index) => ({
+          ...stop,
+          arrivalTime: stop.Arrival_Time ? new Date(stop.Arrival_Time) : null,
+          departureTime: stop.Departure_Time ? new Date(stop.Departure_Time) : null,
+          isOrigin: index === 0,
+          isDestination: index === trainData.Route.length - 1
+        }));
+
+        // Apply delays to all times
+        if (trainData.Initial_Reported_Delay_Mins > 0) {
+          const delayMs = trainData.Initial_Reported_Delay_Mins * 60 * 1000;
+          processedRoute = processedRoute.map(stop => ({
+            ...stop,
+            arrivalTime: stop.arrivalTime ? new Date(stop.arrivalTime.getTime() + delayMs) : null,
+            departureTime: stop.departureTime ? new Date(stop.departureTime.getTime() + delayMs) : null
+          }));
+        }
+      } else {
+        // Legacy schedule format - convert to new format
+        const startStation = trainData.Section_Start || 'NDLS';
+        const endStation = trainData.Section_End || 'GZB';
+        const departureTime = new Date(trainData.Scheduled_Departure_Time);
+        const arrivalTime = new Date(trainData.Scheduled_Arrival_Time);
+
+        // Apply delays
+        if (trainData.Initial_Reported_Delay_Mins > 0) {
+          const delayMs = trainData.Initial_Reported_Delay_Mins * 60 * 1000;
+          departureTime.setTime(departureTime.getTime() + delayMs);
+          arrivalTime.setTime(arrivalTime.getTime() + delayMs);
+        }
+
+        processedRoute = [
+          {
+            Station_ID: startStation,
+            Station_Name: startStation,
+            arrivalTime: null,
+            departureTime: departureTime,
+            Stop_Duration_Mins: 0,
+            Platform: "1",
+            isOrigin: true,
+            isDestination: false
+          },
+          {
+            Station_ID: endStation,
+            Station_Name: endStation,
+            arrivalTime: arrivalTime,
+            departureTime: null,
+            Stop_Duration_Mins: 0,
+            Platform: "1",
+            isOrigin: false,
+            isDestination: true
+          }
+        ];
+      }
+
       const train = {
         ...trainData,
-        // Convert time strings to Date objects
-        scheduledDepartureTime: new Date(trainData.Scheduled_Departure_Time),
-        scheduledArrivalTime: new Date(trainData.Scheduled_Arrival_Time),
+        route: processedRoute,
         
-        // Add dynamic state properties
+        // Journey state tracking
+        currentLegIndex: 0, // Which leg of journey train is on
+        currentStopIndex: 0, // Which stop train is approaching/at
+        isAtStation: false,
+        stationArrivalTime: null,
+        
+        // Dynamic state properties
         currentStatus: 'Scheduled',
         currentPosition: { x: 0, y: 0 },
-        currentTrack: findTrackBetweenStations(trainData.Section_Start, trainData.Section_End, networkData),
         
         // Store original data for reference
         originalData: trainData
       };
 
-      // Adjust times for initial delay
-      if (trainData.Initial_Reported_Delay_Mins > 0) {
-        train.scheduledDepartureTime = new Date(
-          train.scheduledDepartureTime.getTime() + (trainData.Initial_Reported_Delay_Mins * 60 * 1000)
-        );
-        train.scheduledArrivalTime = new Date(
-          train.scheduledArrivalTime.getTime() + (trainData.Initial_Reported_Delay_Mins * 60 * 1000)
-        );
-      }
-
       return train;
     });
   }, []);
 
-  // Step 3: Core function to calculate train position
+  // Step 3: Enhanced function to calculate train position for multi-stop journeys
   const calculateTrainPosition = useCallback((train, currentTime, networkData) => {
-    if (!train || !currentTime || !networkData) {
-      return { status: 'Unknown', position: { x: 0, y: 0 } };
+    if (!train || !currentTime || !networkData || !train.route || train.route.length === 0) {
+      return { 
+        status: 'Unknown', 
+        position: { x: 0, y: 0 },
+        currentStop: null,
+        nextStop: null,
+        isAtStation: false
+      };
     }
-
-    const { scheduledDepartureTime, scheduledArrivalTime, Section_Start, Section_End, Initial_Reported_Delay_Mins } = train;
 
     // Station coordinates mapping - dynamically generated from network data or fallback
     const stationCoordinates = {};
@@ -104,43 +171,97 @@ export const useTrainSimulation = () => {
       });
     }
 
-    const startCoords = stationCoordinates[Section_Start] || { x: 0, y: 0 };
-    const endCoords = stationCoordinates[Section_End] || { x: 100, y: 0 };
+    const route = train.route;
+    const firstStop = route[0];
+    const lastStop = route[route.length - 1];
 
-    // Determine status and position
-    if (currentTime < scheduledDepartureTime) {
-      // Train hasn't departed yet
+    // Check if train hasn't started yet
+    if (currentTime < firstStop.departureTime) {
       return {
         status: 'Scheduled',
-        position: startCoords
-      };
-    } else if (currentTime > scheduledArrivalTime) {
-      // Train has arrived
-      return {
-        status: 'Arrived',
-        position: endCoords
-      };
-    } else {
-      // Train is en-route
-      const status = Initial_Reported_Delay_Mins > 0 ? 'Delayed' : 'En-Route';
-      
-      // Calculate progress percentage
-      const totalJourneyTime = scheduledArrivalTime.getTime() - scheduledDepartureTime.getTime();
-      const timeElapsed = currentTime.getTime() - scheduledDepartureTime.getTime();
-      const progressPercentage = Math.max(0, Math.min(1, timeElapsed / totalJourneyTime));
-
-      // Linear interpolation between start and end coordinates
-      const currentX = startCoords.x + (endCoords.x - startCoords.x) * progressPercentage;
-      const currentY = startCoords.y + (endCoords.y - startCoords.y) * progressPercentage;
-
-      return {
-        status,
-        position: { x: currentX, y: currentY }
+        position: stationCoordinates[firstStop.Station_ID] || { x: 0, y: 0 },
+        currentStop: firstStop,
+        nextStop: route[1] || null,
+        isAtStation: true,
+        stationInfo: `Platform ${firstStop.Platform}`
       };
     }
+
+    // Check if train has completed its journey
+    if (lastStop.arrivalTime && currentTime >= lastStop.arrivalTime) {
+      return {
+        status: 'Arrived',
+        position: stationCoordinates[lastStop.Station_ID] || { x: 100, y: 0 },
+        currentStop: lastStop,
+        nextStop: null,
+        isAtStation: true,
+        stationInfo: `Platform ${lastStop.Platform} - Journey Complete`
+      };
+    }
+
+    // Find current leg of journey
+    for (let i = 0; i < route.length - 1; i++) {
+      const currentStop = route[i];
+      const nextStop = route[i + 1];
+      
+      const legDepartureTime = currentStop.departureTime || currentStop.arrivalTime;
+      const legArrivalTime = nextStop.arrivalTime;
+
+      if (!legDepartureTime || !legArrivalTime) continue;
+
+      // Check if train is between these two stops
+      if (currentTime >= legDepartureTime && currentTime <= legArrivalTime) {
+        const currentStopCoords = stationCoordinates[currentStop.Station_ID] || { x: 0, y: 0 };
+        const nextStopCoords = stationCoordinates[nextStop.Station_ID] || { x: 100, y: 0 };
+
+        // Calculate progress along this leg
+        const legDuration = legArrivalTime.getTime() - legDepartureTime.getTime();
+        const timeElapsed = currentTime.getTime() - legDepartureTime.getTime();
+        const progressPercentage = Math.max(0, Math.min(1, timeElapsed / legDuration));
+
+        // Linear interpolation between current and next station
+        const currentX = currentStopCoords.x + (nextStopCoords.x - currentStopCoords.x) * progressPercentage;
+        const currentY = currentStopCoords.y + (nextStopCoords.y - currentStopCoords.y) * progressPercentage;
+
+        const status = train.Initial_Reported_Delay_Mins > 0 ? 'Delayed' : 'En-Route';
+
+        return {
+          status,
+          position: { x: currentX, y: currentY },
+          currentStop: currentStop,
+          nextStop: nextStop,
+          isAtStation: false,
+          progressPercentage,
+          stationInfo: `${currentStop.Station_Name} → ${nextStop.Station_Name}`
+        };
+      }
+
+      // Check if train is currently stopped at a station
+      if (nextStop.arrivalTime && nextStop.departureTime && 
+          currentTime >= nextStop.arrivalTime && currentTime < nextStop.departureTime) {
+        return {
+          status: nextStop.Stop_Duration_Mins > 0 ? 'Stopped' : 'En-Route',
+          position: stationCoordinates[nextStop.Station_ID] || { x: 0, y: 0 },
+          currentStop: nextStop,
+          nextStop: route[i + 2] || null,
+          isAtStation: true,
+          stationInfo: `Platform ${nextStop.Platform} - ${nextStop.Stop_Duration_Mins}min stop`
+        };
+      }
+    }
+
+    // Fallback - return position at origin
+    return {
+      status: 'Unknown',
+      position: stationCoordinates[firstStop.Station_ID] || { x: 0, y: 0 },
+      currentStop: firstStop,
+      nextStop: route[1] || null,
+      isAtStation: true,
+      stationInfo: 'Unknown Status'
+    };
   }, []);
 
-  // Load schedule function
+  // Load schedule function (Enhanced to try new schedule format first)
   const loadSchedule = useCallback(async () => {
     try {
       // Load network graph data
@@ -148,9 +269,21 @@ export const useTrainSimulation = () => {
       const networkData = await networkResponse.json();
       setNetworkData(networkData);
 
-      // Load schedule data
-      const scheduleResponse = await fetch('/schedule.json');
-      const scheduleData = await scheduleResponse.json();
+      let scheduleData;
+      
+      try {
+        // Try to load enhanced schedule first
+        const enhancedResponse = await fetch('/enhanced_schedule.json');
+        scheduleData = await enhancedResponse.json();
+        console.log('✅ Loaded enhanced multi-stop schedule');
+      } catch (enhancedError) {
+        console.log('Enhanced schedule not found, falling back to legacy schedule');
+        // Fallback to legacy schedule
+        const legacyResponse = await fetch('/schedule.json');
+        scheduleData = await legacyResponse.json();
+        console.log('✅ Loaded legacy schedule');
+      }
+      
       setRawScheduleData(scheduleData);
 
       // Preprocess train data
@@ -164,7 +297,8 @@ export const useTrainSimulation = () => {
       console.log('Schedule loaded successfully:', {
         trains: processedTrains.length,
         networkStations: Object.keys(networkData.stations || {}).length,
-        simulationStartTime: earliestTime.toISOString()
+        simulationStartTime: earliestTime.toISOString(),
+        hasMultiStopRoutes: scheduleData.some(train => train.Route && train.Route.length > 2)
       });
 
       return { networkData, trains: processedTrains, simulationTime: earliestTime };
@@ -174,7 +308,7 @@ export const useTrainSimulation = () => {
     }
   }, [preprocessTrainData]);
 
-  // Step 4: Simulation loop
+  // Step 4: Enhanced simulation loop for multi-stop journeys
   useEffect(() => {
     if (!isRunning || !simulationTime || trains.length === 0) return;
 
@@ -185,11 +319,16 @@ export const useTrainSimulation = () => {
         
         // Update train positions based on new time
         const updatedTrains = trains.map(train => {
-          const { status, position } = calculateTrainPosition(train, newTime, networkData);
+          const positionData = calculateTrainPosition(train, newTime, networkData);
           return {
             ...train,
-            currentStatus: status,
-            currentPosition: position
+            currentStatus: positionData.status,
+            currentPosition: positionData.position,
+            currentStop: positionData.currentStop,
+            nextStop: positionData.nextStop,
+            isAtStation: positionData.isAtStation,
+            stationInfo: positionData.stationInfo,
+            progressPercentage: positionData.progressPercentage || 0
           };
         });
         

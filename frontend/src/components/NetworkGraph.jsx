@@ -110,11 +110,7 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
       },
       borderWidth: 2,
       shadow: {
-        enabled: true,
-        color: 'rgba(59, 130, 246, 0.3)',
-        size: 10,
-        x: 0,
-        y: 0,
+        enabled: false, // Disable shadows for better performance
       },
     },
     edges: {
@@ -125,16 +121,10 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
         strokeColor: '#0a0f1c',
       },
       smooth: {
-        enabled: true,
-        type: 'continuous',
-        roundness: 0.1,
+        enabled: false, // Disable smooth edges for better performance
       },
       shadow: {
-        enabled: true,
-        color: 'rgba(59, 130, 246, 0.2)',
-        size: 5,
-        x: 0,
-        y: 0,
+        enabled: false, // Disable shadows for better performance
       },
     },
     groups: {
@@ -186,10 +176,14 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
       dragNodes: false,
       zoomView: true,
       dragView: true,
+      hover: true,
     },
     layout: {
       improvedLayout: false,
     },
+    autoResize: true,
+    height: '400px',
+    width: '100%',
   });
 
   // Initialize network
@@ -197,31 +191,61 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
     if (networkContainer.current) {
       const { nodes, edges } = getNetworkData();
       
+      console.log('Initializing network with:', nodes.length, 'nodes and', edges.length, 'edges');
+      
       // Add trains if available
       if (networkState?.trains) {
         addTrainNodes(nodes, networkState.trains);
+        console.log('Added train nodes:', Object.keys(networkState.trains || {}).length);
       }
 
       const data = { nodes, edges };
       const options = getNetworkOptions();
 
-      networkInstance.current = new Network(networkContainer.current, data, options);
+      try {
+        networkInstance.current = new Network(networkContainer.current, data, options);
 
-      // Event handlers
-      networkInstance.current.on('click', (params) => {
-        if (params.nodes.length > 0) {
-          const nodeId = params.nodes[0];
-          console.log('Clicked node:', nodeId);
-        }
-      });
+        // Event handlers
+        networkInstance.current.on('click', (params) => {
+          if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0];
+            console.log('Clicked node:', nodeId);
+          }
+        });
 
-      // Fit the network to view
-      networkInstance.current.fit();
+        // Wait for the network to be fully ready before fitting
+        networkInstance.current.once('afterDrawing', () => {
+          console.log('Main network ready, fitting view');
+          if (networkInstance.current && typeof networkInstance.current.fit === 'function') {
+            try {
+              networkInstance.current.fit({
+                animation: {
+                  duration: 1000,
+                  easingFunction: 'easeInOutQuad'
+                }
+              });
+            } catch (fitError) {
+              console.error('Error fitting network:', fitError);
+              // Fallback: try simple fit without animation
+              try {
+                networkInstance.current.fit();
+              } catch (simpleFitError) {
+                console.error('Simple fit also failed:', simpleFitError);
+              }
+            }
+          }
+        });
+
+        console.log('Network initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize network:', error);
+      }
     }
 
     return () => {
       if (networkInstance.current) {
         networkInstance.current.destroy();
+        networkInstance.current = null;
       }
     };
   }, []);
@@ -261,22 +285,34 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
 
   // Control functions
   const handleZoomIn = () => {
-    if (networkInstance.current) {
-      const scale = networkInstance.current.getScale();
-      networkInstance.current.moveTo({ scale: scale * 1.2 });
+    if (networkInstance.current && typeof networkInstance.current.getScale === 'function') {
+      try {
+        const scale = networkInstance.current.getScale();
+        networkInstance.current.moveTo({ scale: scale * 1.2 });
+      } catch (error) {
+        console.error('Zoom in failed:', error);
+      }
     }
   };
 
   const handleZoomOut = () => {
-    if (networkInstance.current) {
-      const scale = networkInstance.current.getScale();
-      networkInstance.current.moveTo({ scale: scale * 0.8 });
+    if (networkInstance.current && typeof networkInstance.current.getScale === 'function') {
+      try {
+        const scale = networkInstance.current.getScale();
+        networkInstance.current.moveTo({ scale: scale * 0.8 });
+      } catch (error) {
+        console.error('Zoom out failed:', error);
+      }
     }
   };
 
   const handleReset = () => {
-    if (networkInstance.current) {
-      networkInstance.current.fit();
+    if (networkInstance.current && typeof networkInstance.current.fit === 'function') {
+      try {
+        networkInstance.current.fit();
+      } catch (error) {
+        console.error('Reset view failed:', error);
+      }
     }
   };
 
@@ -285,7 +321,7 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
   };
 
   return (
-    <div className={`relative ${isFullscreen ? 'fixed inset-0 z-40 bg-rail-darker' : 'h-full'}`}>
+    <div className={`relative ${isFullscreen ? 'fixed inset-0 z-40 bg-rail-darker' : 'h-full max-h-full overflow-hidden'}`}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-rail-blue/20">
         <h3 className="text-lg font-semibold">Railway Network Visualization</h3>
@@ -326,8 +362,13 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
       {/* Network Container */}
       <div 
         ref={networkContainer} 
-        className={`bg-rail-darker ${isFullscreen ? 'h-[calc(100vh-80px)]' : 'h-[calc(100%-60px)]'}`}
-        style={{ width: '100%' }}
+        className={`bg-rail-darker ${isFullscreen ? 'h-[calc(100vh-80px)]' : 'h-96'}`}
+        style={{ 
+          width: '100%',
+          maxHeight: isFullscreen ? 'calc(100vh - 80px)' : '400px',
+          position: 'relative',
+          overflow: 'hidden'
+        }}
       />
 
       {/* Legend */}
@@ -368,7 +409,7 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
             <div className="flex justify-between">
               <span className="text-gray-400">Active Trains:</span>
               <span className="text-white font-medium">
-                {Object.keys(networkState.trains).length}
+                {Object.keys(networkState.trains || {}).length}
               </span>
             </div>
             <div className="flex justify-between">

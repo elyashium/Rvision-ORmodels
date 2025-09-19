@@ -147,7 +147,7 @@ function App() {
       </header>
 
       {/* Main Layout */}
-      <div className="flex h-[calc(100vh-100px)] m-4 mt-0 space-x-4">
+      <div className="flex h-[calc(100vh-120px)] m-4 mt-0 space-x-4 overflow-hidden">
         {/* Left Sidebar - Control Panel */}
         <div className="w-80 flex flex-col">
           <ControlPanel
@@ -161,18 +161,16 @@ function App() {
         </div>
 
         {/* Main Content - Network Visualization */}
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 rail-card p-4">
-            <div className="h-full">
-              <NetworkGraph
-                networkState={networkState}
-                isSimulationRunning={isSimulationRunning}
-              />
-            </div>
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 rail-card p-4 min-h-0">
+            <NetworkGraph
+              networkState={networkState}
+              isSimulationRunning={isSimulationRunning}
+            />
           </div>
 
           {/* Bottom Panel - Alerts and Recommendations */}
-          <div className="h-64 mt-4">
+          <div className="h-64 mt-4 flex-shrink-0">
             <AlertsAndRecommendations
               alerts={alerts}
               recommendations={recommendations}

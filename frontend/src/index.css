@@ -21,8 +21,9 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  max-height: 100vh;
   background: linear-gradient(135deg, #0a0f1c 0%, #050914 100%);
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 #root {

@@ -181,29 +181,29 @@ const ControlPanel = ({
               <div className="flex justify-between">
                 <span className="text-gray-400">Active Trains:</span>
                 <span className="text-white font-medium">
-                  {Object.keys(networkState.trains).length}
+                  {networkState?.trains ? Object.keys(networkState.trains).length : 0}
                 </span>
               </div>
               
               <div className="flex justify-between">
                 <span className="text-gray-400">Network Health:</span>
                 <span className={`font-medium capitalize ${
-                  networkState.network_status?.network_health === 'healthy' 
+                  networkState?.network_status?.network_health === 'healthy' 
                     ? 'text-rail-success' 
                     : 'text-rail-warning'
                 }`}>
-                  {networkState.network_status?.network_health || 'Unknown'}
+                  {networkState?.network_status?.network_health || 'Unknown'}
                 </span>
               </div>
               
               <div className="flex justify-between">
                 <span className="text-gray-400">Operational Tracks:</span>
                 <span className="text-white font-medium">
-                  {networkState.network_status?.operational_tracks || 0} / {networkState.network_status?.total_tracks || 0}
+                  {networkState?.network_status?.operational_tracks || 0} / {networkState?.network_status?.total_tracks || 0}
                 </span>
               </div>
               
-              {networkState.network_status?.failed_tracks > 0 && (
+              {(networkState?.network_status?.failed_tracks || 0) > 0 && (
                 <div className="flex justify-between">
                   <span className="text-gray-400">Failed Tracks:</span>
                   <span className="text-rail-danger font-medium">

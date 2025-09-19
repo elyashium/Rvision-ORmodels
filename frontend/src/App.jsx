@@ -12,6 +12,7 @@ function App() {
   const [alerts, setAlerts] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [systemHealth, setSystemHealth] = useState('healthy');
+  const [isNetworkFullscreen, setIsNetworkFullscreen] = useState(false);
 
   // Fetch initial system state
   useEffect(() => {
@@ -105,8 +106,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white text-rail-text">
-      {/* Premium Notch Header */}
-      <header className="notch-header">
+      {/* Premium Notch Header - Hide in fullscreen */}
+      {!isNetworkFullscreen && (
+        <header className="notch-header">
         <div className="notch-content">
           <Train className="w-4 h-4 text-rail-text flex-shrink-0" />
           <span className="text-xs font-semibold text-rail-text whitespace-nowrap">R-Vision</span>
@@ -137,47 +139,104 @@ function App() {
             )}
           </div>
         </div>
-      </header>
+        </header>
+      )}
 
       {/* Main Layout */}
-      <div className="flex h-[calc(100vh-20px)] p-3 pt-16 gap-3">
-        {/* Left Sidebar - Control Panel */}
-        <div className="w-64 flex flex-col">
-          <ControlPanel
-            networkState={networkState}
-            isSimulationRunning={isSimulationRunning}
-            onScheduleUploaded={handleScheduleUploaded}
-            onSimulationStart={handleSimulationStart}
-            onSimulationStop={handleSimulationStop}
-            onDisruptionReported={handleDisruptionReported}
-          />
-        </div>
-
-        {/* Main Content - Network Visualization and Alerts */}
-        <div className="flex-1 flex gap-3 min-h-0">
-          {/* Network Visualization */}
-          <div className="flex-1 rail-card p-3 min-h-0">
-            <NetworkGraph
+      {!isNetworkFullscreen ? (
+        <div className="flex h-[calc(100vh-20px)] p-3 pt-16 gap-3">
+          {/* Left Sidebar - Control Panel */}
+          <div className="w-64 flex flex-col">
+            <ControlPanel
               networkState={networkState}
               isSimulationRunning={isSimulationRunning}
+              onScheduleUploaded={handleScheduleUploaded}
+              onSimulationStart={handleSimulationStart}
+              onSimulationStop={handleSimulationStop}
+              onDisruptionReported={handleDisruptionReported}
             />
           </div>
 
-          {/* Right Panel - Alerts and Recommendations */}
-          <div className="w-72 flex-shrink-0">
-            <AlertsAndRecommendations
-              alerts={alerts}
-              recommendations={recommendations}
-              onAcceptRecommendation={(recommendation) => {
-                addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
-              }}
-              onRejectRecommendation={(recommendation) => {
-                addAlert('info', 'Recommendation rejected', 'Manual override applied');
-              }}
-            />
+          {/* Main Content - Network Visualization and Alerts */}
+          <div className="flex-1 flex gap-3 min-h-0">
+            {/* Network Visualization */}
+            <div className="flex-1 rail-card p-3 min-h-0">
+              <NetworkGraph
+                networkState={networkState}
+                isSimulationRunning={isSimulationRunning}
+                onFullscreenChange={setIsNetworkFullscreen}
+                leftPanelContent={
+                  <ControlPanel
+                    networkState={networkState}
+                    isSimulationRunning={isSimulationRunning}
+                    onScheduleUploaded={handleScheduleUploaded}
+                    onSimulationStart={handleSimulationStart}
+                    onSimulationStop={handleSimulationStop}
+                    onDisruptionReported={handleDisruptionReported}
+                  />
+                }
+                rightPanelContent={
+                  <AlertsAndRecommendations
+                    alerts={alerts}
+                    recommendations={recommendations}
+                    onAcceptRecommendation={(recommendation) => {
+                      addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
+                    }}
+                    onRejectRecommendation={(recommendation) => {
+                      addAlert('info', 'Recommendation rejected', 'Manual override applied');
+                    }}
+                  />
+                }
+              />
+            </div>
+
+            {/* Right Panel - Alerts and Recommendations */}
+            <div className="w-72 flex-shrink-0">
+              <AlertsAndRecommendations
+                alerts={alerts}
+                recommendations={recommendations}
+                onAcceptRecommendation={(recommendation) => {
+                  addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
+                }}
+                onRejectRecommendation={(recommendation) => {
+                  addAlert('info', 'Recommendation rejected', 'Manual override applied');
+                }}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        /* Fullscreen Network Visualization */
+        <div className="h-screen">
+          <NetworkGraph
+            networkState={networkState}
+            isSimulationRunning={isSimulationRunning}
+            onFullscreenChange={setIsNetworkFullscreen}
+            leftPanelContent={
+              <ControlPanel
+                networkState={networkState}
+                isSimulationRunning={isSimulationRunning}
+                onScheduleUploaded={handleScheduleUploaded}
+                onSimulationStart={handleSimulationStart}
+                onSimulationStop={handleSimulationStop}
+                onDisruptionReported={handleDisruptionReported}
+              />
+            }
+            rightPanelContent={
+              <AlertsAndRecommendations
+                alerts={alerts}
+                recommendations={recommendations}
+                onAcceptRecommendation={(recommendation) => {
+                  addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
+                }}
+                onRejectRecommendation={(recommendation) => {
+                  addAlert('info', 'Recommendation rejected', 'Manual override applied');
+                }}
+              />
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -3,11 +3,13 @@ import { Network } from 'vis-network';
 import { DataSet } from 'vis-data';
 import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 
-const NetworkGraph = ({ networkState, isSimulationRunning }) => {
+const NetworkGraph = ({ networkState, isSimulationRunning, leftPanelContent, rightPanelContent, onFullscreenChange }) => {
   const networkContainer = useRef(null);
   const networkInstance = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [trainPositions, setTrainPositions] = useState({});
+  const [showLeftPanel, setShowLeftPanel] = useState(false);
+  const [showRightPanel, setShowRightPanel] = useState(false);
 
   // Network graph data (stations and tracks) - loaded from your network_graph.json structure
   const getNetworkData = () => {
@@ -283,6 +285,30 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
     }
   }, [networkState, isSimulationRunning]);
 
+
+  // Mouse position tracking for floating panels
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const handleMouseMove = (e) => {
+      const threshold = 80; // pixels from edge
+      const panelWidth = 320; // width of the panels when visible
+      const windowWidth = window.innerWidth;
+      
+      // Show left panel when mouse is near left edge or over the panel
+      setShowLeftPanel(e.clientX < threshold || (showLeftPanel && e.clientX < panelWidth));
+      
+      // Show right panel when mouse is near right edge or over the panel
+      setShowRightPanel(e.clientX > windowWidth - threshold || (showRightPanel && e.clientX > windowWidth - panelWidth));
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [isFullscreen, showLeftPanel, showRightPanel]);
+
   // Control functions
   const handleZoomIn = () => {
     if (networkInstance.current && typeof networkInstance.current.getScale === 'function') {
@@ -317,17 +343,57 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
   };
 
   const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
+    const newFullscreenState = !isFullscreen;
+    setIsFullscreen(newFullscreenState);
+    if (onFullscreenChange) {
+      onFullscreenChange(newFullscreenState);
+    }
   };
 
   return (
-    <div className={`relative ${isFullscreen ? 'fixed inset-0 z-40 bg-rail-darker' : 'h-full max-h-full overflow-hidden'}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-2 border-b border-rail-gray">
-        <h3 className="text-xs font-semibold text-rail-text">Railway Network Visualization</h3>
-        
-        {/* Controls */}
-        <div className="flex items-center space-x-1">
+    <div className={`relative ${isFullscreen ? 'h-full bg-white' : 'h-full max-h-full overflow-hidden'}`}>
+      {/* Header - Only show when not in fullscreen */}
+      {!isFullscreen && (
+        <div className="flex items-center justify-between p-2 border-b border-rail-gray">
+          <h3 className="text-xs font-semibold text-rail-text">Railway Network Visualization</h3>
+          
+          {/* Controls */}
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={handleZoomIn}
+              className="p-1 hover:bg-rail-gray rounded transition-colors"
+              title="Zoom In"
+            >
+              <ZoomIn className="w-3 h-3 text-rail-text" />
+            </button>
+            <button
+              onClick={handleZoomOut}
+              className="p-1 hover:bg-rail-gray rounded transition-colors"
+              title="Zoom Out"
+            >
+              <ZoomOut className="w-3 h-3 text-rail-text" />
+            </button>
+            <button
+              onClick={handleReset}
+              className="p-1 hover:bg-rail-gray rounded transition-colors"
+              title="Reset View"
+            >
+              <RotateCcw className="w-3 h-3 text-rail-text" />
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              className="p-1 hover:bg-rail-gray rounded transition-colors"
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            >
+              {isFullscreen ? <Minimize2 className="w-3 h-3 text-rail-text" /> : <Maximize2 className="w-3 h-3 text-rail-text" />}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Controls */}
+      {isFullscreen && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 flex items-center space-x-4 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-rail-gray">
           <button
             onClick={handleZoomIn}
             className="p-1 hover:bg-rail-gray rounded transition-colors"
@@ -352,20 +418,20 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
           <button
             onClick={toggleFullscreen}
             className="p-1 hover:bg-rail-gray rounded transition-colors"
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            title="Exit Fullscreen"
           >
-            {isFullscreen ? <Minimize2 className="w-3 h-3 text-rail-text" /> : <Maximize2 className="w-3 h-3 text-rail-text" />}
+            <Minimize2 className="w-3 h-3 text-rail-text" />
           </button>
         </div>
-      </div>
+      )}
 
       {/* Network Container */}
       <div 
         ref={networkContainer} 
-        className={`bg-white ${isFullscreen ? 'h-[calc(100vh-80px)]' : 'h-[calc(100%-40px)]'}`}
+        className={`bg-white ${isFullscreen ? 'h-full' : 'h-[calc(100%-40px)]'}`}
         style={{ 
           width: '100%',
-          maxHeight: isFullscreen ? 'calc(100vh - 80px)' : 'calc(100% - 40px)',
+          maxHeight: isFullscreen ? '100%' : 'calc(100% - 40px)',
           position: 'relative',
           overflow: 'hidden'
         }}
@@ -422,16 +488,40 @@ const NetworkGraph = ({ networkState, isSimulationRunning }) => {
         </div>
       )}
 
+      {/* Hover indicators for fullscreen */}
       {isFullscreen && (
-        <div className="absolute top-4 right-4">
-          <button
-            onClick={toggleFullscreen}
-            className="rail-button-secondary px-3 py-2"
-          >
-            Exit Fullscreen
-          </button>
+        <>
+          <div className="absolute left-2 top-1/2 transform -translate-y-1/2 text-rail-text-secondary text-xs opacity-30 pointer-events-none">
+            ← Hover for Controls
+          </div>
+          <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-rail-text-secondary text-xs opacity-30 pointer-events-none">
+            Hover for Alerts →
+          </div>
+        </>
+      )}
+
+      {/* Floating Left Panel - Control Panel */}
+      {isFullscreen && leftPanelContent && (
+        <div className={`absolute left-0 top-0 h-full w-80 bg-white/95 backdrop-blur-sm border-r border-rail-gray shadow-2xl z-50 transform transition-transform duration-300 ease-out ${
+          showLeftPanel ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+          <div className="h-full overflow-y-auto p-4">
+            {leftPanelContent}
+          </div>
         </div>
       )}
+
+      {/* Floating Right Panel - Alerts */}
+      {isFullscreen && rightPanelContent && (
+        <div className={`absolute right-0 top-0 h-full w-96 bg-white/95 backdrop-blur-sm border-l border-rail-gray shadow-2xl z-50 transform transition-transform duration-300 ease-out ${
+          showRightPanel ? 'translate-x-0' : 'translate-x-full'
+        }`}>
+          <div className="h-full overflow-y-auto p-4">
+            {rightPanelContent}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

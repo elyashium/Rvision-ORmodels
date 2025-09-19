@@ -1,0 +1,398 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { Network } from 'vis-network/standalone/esm/vis-network';
+import { DataSet } from 'vis-data/esmjs';
+import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+
+const NetworkGraph = ({ networkState, isSimulationRunning }) => {
+  const networkContainer = useRef(null);
+  const networkInstance = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [trainPositions, setTrainPositions] = useState({});
+
+  // Network graph data (stations and tracks) - loaded from your network_graph.json structure
+  const getNetworkData = () => {
+    const nodes = new DataSet([
+      // Stations as nodes
+      { id: 'NDLS', label: 'New Delhi\nStation', x: 0, y: 0, group: 'major_junction', title: 'New Delhi Station (Major Junction)' },
+      { id: 'ANVR', label: 'Anand Vihar\nTerminal', x: 300, y: -50, group: 'terminal', title: 'Anand Vihar Terminal' },
+      { id: 'GZB', label: 'Ghaziabad\nJunction', x: 600, y: 0, group: 'major_junction', title: 'Ghaziabad Junction' },
+      { id: 'SBB', label: 'Sahibabad', x: 500, y: 150, group: 'intermediate', title: 'Sahibabad (Intermediate)' },
+      { id: 'VVB', label: 'Vivek Vihar', x: 300, y: 100, group: 'intermediate', title: 'Vivek Vihar (Intermediate)' },
+      { id: 'SHZM', label: 'Shaheed Nagar', x: 150, y: 75, group: 'small', title: 'Shaheed Nagar (Small Station)' },
+      { id: 'DLI', label: 'Old Delhi\nJunction', x: -100, y: 50, group: 'junction', title: 'Old Delhi Junction' },
+      { id: 'MUT', label: 'Meerut City', x: 800, y: -100, group: 'destination', title: 'Meerut City (Destination)' },
+    ]);
+
+    const edges = new DataSet([
+      // Main tracks
+      { id: 'NDLS_ANVR_MAIN', from: 'NDLS', to: 'ANVR', label: 'Main Line', color: { color: '#3b82f6' }, width: 3, title: 'NDLS-ANVR Main Line (25 min)' },
+      { id: 'ANVR_GZB_MAIN', from: 'ANVR', to: 'GZB', label: 'Main Line', color: { color: '#3b82f6' }, width: 3, title: 'ANVR-GZB Main Line (30 min)' },
+      { id: 'GZB_MUT_EXTENSION', from: 'GZB', to: 'MUT', label: 'Extension', color: { color: '#3b82f6' }, width: 3, title: 'GZB-MUT Extension (60 min)' },
+      
+      // Alternative routes
+      { id: 'NDLS_SBB_ALT', from: 'NDLS', to: 'SBB', label: 'Alt Route', color: { color: '#06b6d4' }, width: 2, dashes: [5, 5], title: 'NDLS-SBB Alternative (35 min)' },
+      { id: 'SBB_GZB_ALT', from: 'SBB', to: 'GZB', label: 'Alt Route', color: { color: '#06b6d4' }, width: 2, dashes: [5, 5], title: 'SBB-GZB Alternative (20 min)' },
+      
+      // Bypass routes
+      { id: 'NDLS_VVB_BYPASS', from: 'NDLS', to: 'VVB', label: 'Bypass', color: { color: '#10b981' }, width: 1, dashes: [10, 5], title: 'NDLS-VVB Bypass (40 min)' },
+      { id: 'VVB_ANVR_BYPASS', from: 'VVB', to: 'ANVR', label: 'Bypass', color: { color: '#10b981' }, width: 1, dashes: [10, 5], title: 'VVB-ANVR Bypass (18 min)' },
+      
+      // Local connections
+      { id: 'NDLS_DLI_CONNECTOR', from: 'NDLS', to: 'DLI', label: 'Connector', color: { color: '#f59e0b' }, width: 2, title: 'NDLS-DLI Connector (8 min)' },
+      { id: 'DLI_SHZM_LOCAL', from: 'DLI', to: 'SHZM', label: 'Local', color: { color: '#f59e0b' }, width: 1, title: 'DLI-SHZM Local (15 min)' },
+      { id: 'SHZM_ANVR_LOCAL', from: 'SHZM', to: 'ANVR', label: 'Local', color: { color: '#f59e0b' }, width: 1, title: 'SHZM-ANVR Local (20 min)' },
+    ]);
+
+    return { nodes, edges };
+  };
+
+  // Add train nodes to the visualization
+  const addTrainNodes = (nodes, trains) => {
+    if (!trains) return;
+
+    Object.values(trains).forEach(train => {
+      const trainId = `train_${train.train_id}`;
+      
+      // Determine train position based on current location and route
+      const position = getTrainPosition(train);
+      
+      nodes.add({
+        id: trainId,
+        label: train.train_id.split('_')[0],
+        x: position.x,
+        y: position.y,
+        group: 'train',
+        title: `${train.train_name}\nStatus: ${train.status}\nDelay: ${train.current_delay_mins}min\nRoute: ${train.section_start} → ${train.section_end}`,
+        physics: false, // Trains don't participate in physics simulation
+      });
+    });
+  };
+
+  // Calculate train position based on its current state
+  const getTrainPosition = (train) => {
+    const stationPositions = {
+      'NDLS': { x: 0, y: 0 },
+      'ANVR': { x: 300, y: -50 },
+      'GZB': { x: 600, y: 0 },
+      'SBB': { x: 500, y: 150 },
+      'VVB': { x: 300, y: 100 },
+      'SHZM': { x: 150, y: 75 },
+      'DLI': { x: -100, y: 50 },
+      'MUT': { x: 800, y: -100 },
+      'Anand_Vihar': { x: 300, y: -50 },
+      'Ghaziabad': { x: 600, y: 0 },
+      'Aligarh': { x: 900, y: 100 },
+    };
+
+    const start = stationPositions[train.section_start] || stationPositions[train.current_location] || { x: 0, y: 0 };
+    const end = stationPositions[train.section_end] || { x: 100, y: 0 };
+
+    // Simple animation: move train along the route based on simulation time
+    const progress = isSimulationRunning ? 
+      ((Date.now() / 10000) % 1) : // Complete route every 10 seconds during simulation
+      0; // Static position when not simulating
+
+    return {
+      x: start.x + (end.x - start.x) * progress + Math.random() * 20 - 10, // Add slight randomness
+      y: start.y + (end.y - start.y) * progress + Math.random() * 20 - 10,
+    };
+  };
+
+  // Network configuration options
+  const getNetworkOptions = () => ({
+    nodes: {
+      shape: 'dot',
+      size: 16,
+      font: {
+        size: 12,
+        color: '#ffffff',
+        face: 'JetBrains Mono',
+      },
+      borderWidth: 2,
+      shadow: {
+        enabled: true,
+        color: 'rgba(59, 130, 246, 0.3)',
+        size: 10,
+        x: 0,
+        y: 0,
+      },
+    },
+    edges: {
+      font: {
+        size: 10,
+        color: '#ffffff',
+        strokeWidth: 2,
+        strokeColor: '#0a0f1c',
+      },
+      smooth: {
+        enabled: true,
+        type: 'continuous',
+        roundness: 0.1,
+      },
+      shadow: {
+        enabled: true,
+        color: 'rgba(59, 130, 246, 0.2)',
+        size: 5,
+        x: 0,
+        y: 0,
+      },
+    },
+    groups: {
+      major_junction: {
+        color: { background: '#3b82f6', border: '#1e40af' },
+        size: 25,
+        shape: 'diamond',
+      },
+      terminal: {
+        color: { background: '#06b6d4', border: '#0891b2' },
+        size: 20,
+        shape: 'square',
+      },
+      junction: {
+        color: { background: '#10b981', border: '#059669' },
+        size: 18,
+        shape: 'triangle',
+      },
+      intermediate: {
+        color: { background: '#f59e0b', border: '#d97706' },
+        size: 15,
+        shape: 'circle',
+      },
+      small: {
+        color: { background: '#6b7280', border: '#4b5563' },
+        size: 12,
+        shape: 'circle',
+      },
+      destination: {
+        color: { background: '#8b5cf6', border: '#7c3aed' },
+        size: 22,
+        shape: 'star',
+      },
+      train: {
+        color: { 
+          background: '#ef4444', 
+          border: '#dc2626',
+          highlight: { background: '#f87171', border: '#ef4444' },
+        },
+        size: 12,
+        shape: 'triangle',
+        font: { size: 10, color: '#ffffff' },
+      },
+    },
+    physics: {
+      enabled: false, // Disable physics for fixed layout
+    },
+    interaction: {
+      dragNodes: false,
+      zoomView: true,
+      dragView: true,
+    },
+    layout: {
+      improvedLayout: false,
+    },
+  });
+
+  // Initialize network
+  useEffect(() => {
+    if (networkContainer.current) {
+      const { nodes, edges } = getNetworkData();
+      
+      // Add trains if available
+      if (networkState?.trains) {
+        addTrainNodes(nodes, networkState.trains);
+      }
+
+      const data = { nodes, edges };
+      const options = getNetworkOptions();
+
+      networkInstance.current = new Network(networkContainer.current, data, options);
+
+      // Event handlers
+      networkInstance.current.on('click', (params) => {
+        if (params.nodes.length > 0) {
+          const nodeId = params.nodes[0];
+          console.log('Clicked node:', nodeId);
+        }
+      });
+
+      // Fit the network to view
+      networkInstance.current.fit();
+    }
+
+    return () => {
+      if (networkInstance.current) {
+        networkInstance.current.destroy();
+      }
+    };
+  }, []);
+
+  // Update train positions during simulation
+  useEffect(() => {
+    if (networkInstance.current && networkState?.trains) {
+      const { nodes } = networkInstance.current.body.data;
+      
+      // Update existing train positions
+      Object.values(networkState.trains).forEach(train => {
+        const trainId = `train_${train.train_id}`;
+        const position = getTrainPosition(train);
+        
+        try {
+          nodes.update({
+            id: trainId,
+            x: position.x,
+            y: position.y,
+            title: `${train.train_name}\nStatus: ${train.status}\nDelay: ${train.current_delay_mins}min\nRoute: ${train.section_start} → ${train.section_end}`,
+          });
+        } catch (error) {
+          // Node doesn't exist, add it
+          nodes.add({
+            id: trainId,
+            label: train.train_id.split('_')[0],
+            x: position.x,
+            y: position.y,
+            group: 'train',
+            title: `${train.train_name}\nStatus: ${train.status}\nDelay: ${train.current_delay_mins}min\nRoute: ${train.section_start} → ${train.section_end}`,
+            physics: false,
+          });
+        }
+      });
+    }
+  }, [networkState, isSimulationRunning]);
+
+  // Control functions
+  const handleZoomIn = () => {
+    if (networkInstance.current) {
+      const scale = networkInstance.current.getScale();
+      networkInstance.current.moveTo({ scale: scale * 1.2 });
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (networkInstance.current) {
+      const scale = networkInstance.current.getScale();
+      networkInstance.current.moveTo({ scale: scale * 0.8 });
+    }
+  };
+
+  const handleReset = () => {
+    if (networkInstance.current) {
+      networkInstance.current.fit();
+    }
+  };
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
+  return (
+    <div className={`relative ${isFullscreen ? 'fixed inset-0 z-40 bg-rail-darker' : 'h-full'}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-rail-blue/20">
+        <h3 className="text-lg font-semibold">Railway Network Visualization</h3>
+        
+        {/* Controls */}
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleZoomIn}
+            className="p-2 hover:bg-rail-blue/20 rounded-lg transition-colors"
+            title="Zoom In"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleZoomOut}
+            className="p-2 hover:bg-rail-blue/20 rounded-lg transition-colors"
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleReset}
+            className="p-2 hover:bg-rail-blue/20 rounded-lg transition-colors"
+            title="Reset View"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 hover:bg-rail-blue/20 rounded-lg transition-colors"
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Network Container */}
+      <div 
+        ref={networkContainer} 
+        className={`bg-rail-darker ${isFullscreen ? 'h-[calc(100vh-80px)]' : 'h-[calc(100%-60px)]'}`}
+        style={{ width: '100%' }}
+      />
+
+      {/* Legend */}
+      <div className="absolute bottom-4 left-4 rail-card p-3 max-w-xs">
+        <h4 className="text-sm font-semibold mb-2">Legend</h4>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-rail-light-blue rounded-full"></div>
+            <span>Major Junction</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-rail-accent rounded-sm"></div>
+            <span>Terminal</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-rail-success rounded-full"></div>
+            <span>Junction</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-rail-warning rounded-full"></div>
+            <span>Intermediate</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-0 h-0 border-l-2 border-r-2 border-b-3 border-transparent border-b-rail-danger"></div>
+            <span>Active Train</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-4 h-0.5 bg-rail-light-blue"></div>
+            <span>Main Track</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Status Indicator */}
+      {networkState && (
+        <div className="absolute top-20 right-4 rail-card p-3">
+          <div className="text-xs space-y-1">
+            <div className="flex justify-between">
+              <span className="text-gray-400">Active Trains:</span>
+              <span className="text-white font-medium">
+                {Object.keys(networkState.trains).length}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400">Simulation:</span>
+              <span className={`font-medium ${isSimulationRunning ? 'text-rail-success' : 'text-rail-gray'}`}>
+                {isSimulationRunning ? 'Running' : 'Paused'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isFullscreen && (
+        <div className="absolute top-4 right-4">
+          <button
+            onClick={toggleFullscreen}
+            className="rail-button-secondary px-3 py-2"
+          >
+            Exit Fullscreen
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default NetworkGraph;

@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  font-family: 'JetBrains Mono', 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #0a0f1c;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0a0f1c 0%, #050914 100%);
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e3a8a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3b82f6;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #06b6d4;
+}
+
+/* Custom component styles */
+.rail-card {
+  @apply bg-rail-dark border border-rail-blue/20 rounded-lg shadow-lg backdrop-blur-sm;
+}
+
+.rail-button-primary {
+  @apply bg-rail-blue hover:bg-rail-light-blue text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-lg hover:shadow-rail-glow;
+}
+
+.rail-button-secondary {
+  @apply bg-rail-gray hover:bg-rail-light-gray text-white font-medium py-2 px-4 rounded-lg transition-all duration-200;
+}
+
+.rail-button-danger {
+  @apply bg-rail-danger hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200;
+}
+
+.rail-input {
+  @apply bg-rail-darker border border-rail-blue/30 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:border-rail-accent focus:ring-1 focus:ring-rail-accent transition-colors;
+}
+
+.rail-select {
+  @apply bg-rail-darker border border-rail-blue/30 rounded-lg px-3 py-2 text-white focus:border-rail-accent focus:ring-1 focus:ring-rail-accent transition-colors;
+}
+
+.status-indicator {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.status-on-time {
+  @apply bg-rail-success/20 text-rail-success border border-rail-success/30;
+}
+
+.status-delayed {
+  @apply bg-rail-warning/20 text-rail-warning border border-rail-warning/30;
+}
+
+.status-critical {
+  @apply bg-rail-danger/20 text-rail-danger border border-rail-danger/30;
+}
+
+/* Animation utilities */
+.animate-train-move {
+  animation: trainMove 2s linear infinite;
+}
+
+@keyframes trainMove {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(10px); }
+}

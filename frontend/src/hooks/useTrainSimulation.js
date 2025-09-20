@@ -63,17 +63,21 @@ export const useTrainSimulation = () => {
   const findTrackBetweenStations = (startStation, endStation, networkData) => {
     if (!networkData?.tracks) return null;
     
-    // First try to find direct track
+    // Normalize station IDs to match network graph
+    const normalizedStart = normalizeStationId(startStation);
+    const normalizedEnd = normalizeStationId(endStation);
+    
+    // First try to find direct track (only operational ones)
     for (const [trackId, track] of Object.entries(networkData.tracks)) {
-      if (track.from === startStation && track.to === endStation) {
+      if (track.from === normalizedStart && track.to === normalizedEnd && track.status === 'operational') {
         return { trackId, track, isDirect: true };
       }
     }
     
     // Try to find alternative route through route_alternatives
     if (networkData.route_alternatives) {
-      const routeKey = `${startStation}_to_${endStation}`;
-      const altRouteKey = `${endStation}_to_${startStation}`;
+      const routeKey = `${normalizedStart}_to_${normalizedEnd}`;
+      const altRouteKey = `${normalizedEnd}_to_${normalizedStart}`;
       
       let routeInfo = networkData.route_alternatives[routeKey] || networkData.route_alternatives[altRouteKey];
       
@@ -167,29 +171,53 @@ export const useTrainSimulation = () => {
     };
   };
 
-  // Helper function to get station coordinates consistently
+  // Helper function to normalize station IDs for network graph compatibility
+  const normalizeStationId = (stationId) => {
+    const stationMapping = {
+      'Anand_Vihar': 'ANVR',
+      'Ghaziabad': 'GZB', 
+      'New_Delhi': 'NDLS',
+      'Sahibabad': 'SBB',
+      'Vivek_Vihar': 'VVB',
+      'Shaheed_Nagar': 'SHZM',
+      'Old_Delhi': 'DLI',
+      'Meerut': 'MUT'
+    };
+    return stationMapping[stationId] || stationId;
+  };
+
+  // Helper function to get station coordinates consistently with network graph
   const getStationCoordinates = (stationId, networkData) => {
-    if (networkData && networkData.stations && networkData.stations[stationId]) {
-      const coords = networkData.stations[stationId].coordinates;
-      // Convert lat/lon to x/y coordinates (simplified projection)
+    // Normalize the station ID first
+    const normalizedId = normalizeStationId(stationId);
+    
+    if (networkData && networkData.stations && networkData.stations[normalizedId]) {
+      const coords = networkData.stations[normalizedId].coordinates;
+      // Convert lat/lon to x/y coordinates (same as NetworkGraph component)
       const x = (coords.lon - 77.2197) * 10000; // Offset from NDLS and scale
       const y = (coords.lat - 28.6431) * 10000; // Offset from NDLS and scale
       return { x, y };
     }
     
-    // Fallback coordinates
+    // Fallback coordinates that match the network graph exactly
     const fallbackCoords = {
       'NDLS': { x: 0, y: 0 },
-      'ANVR': { x: 300, y: -50 },
-      'Anand_Vihar': { x: 300, y: -50 },
-      'GZB': { x: 600, y: 0 },
-      'Ghaziabad': { x: 600, y: 0 },
-      'SBB': { x: 500, y: 150 },
-      'VVB': { x: 300, y: 100 },
-      'SHZM': { x: 150, y: 75 },
-      'DLI': { x: -100, y: 50 },
-      'MUT': { x: 800, y: -100 },
-      'Aligarh': { x: 900, y: 100 },
+      'New_Delhi': { x: 0, y: 0 },
+      'ANVR': { x: 953, y: 38 },
+      'Anand_Vihar': { x: 953, y: 38 },
+      'GZB': { x: 2341, y: 261 },
+      'Ghaziabad': { x: 2341, y: 261 },
+      'SBB': { x: 1471, y: 300 },
+      'Sahibabad': { x: 1471, y: 300 },
+      'VVB': { x: 960, y: 311 },
+      'Vivek_Vihar': { x: 960, y: 311 },
+      'SHZM': { x: 636, y: 136 },
+      'Shaheed_Nagar': { x: 636, y: 136 },
+      'DLI': { x: 22, y: 86 },
+      'Old_Delhi': { x: 22, y: 86 },
+      'MUT': { x: 4867, y: 3414 },
+      'Meerut': { x: 4867, y: 3414 },
+      'Aligarh': { x: 5000, y: 400 },
     };
     
     return fallbackCoords[stationId] || { x: 0, y: 0 };
@@ -437,14 +465,14 @@ export const useTrainSimulation = () => {
         continue;
       }
 
-      console.log(`Checking leg ${i} for train ${train.Train_ID}:`, {
-        currentStop: currentStop.Station_ID,
-        nextStop: nextStop.Station_ID,
-        legDepartureTime: legDepartureTime.toISOString(),
-        legArrivalTime: legArrivalTime.toISOString(),
-        currentTime: currentTime.toISOString(),
-        isInLeg: currentTime >= legDepartureTime && currentTime <= legArrivalTime
-      });
+      // Debug only occasionally to reduce console spam
+      if (Math.random() < 0.05) { // 5% of the time
+        console.log(`Checking leg ${i} for train ${train.Train_ID}:`, {
+          currentStop: currentStop.Station_ID,
+          nextStop: nextStop.Station_ID,
+          isInLeg: currentTime >= legDepartureTime && currentTime <= legArrivalTime
+        });
+      }
 
       // Check if train is between these two stops
       if (currentTime >= legDepartureTime && currentTime <= legArrivalTime) {
@@ -457,39 +485,17 @@ export const useTrainSimulation = () => {
         const trackInfo = findTrackBetweenStations(currentStop.Station_ID, nextStop.Station_ID, networkData);
         let position;
 
-        if (trackInfo) {
-          // Use track-based movement with proper route following
-          const edgePath = getEdgePath(currentStop.Station_ID, nextStop.Station_ID, networkData, trackInfo);
-          if (edgePath) {
-            // Interpolate along the actual edge path (may include intermediate stations)
-            position = interpolateAlongPath(edgePath.path, progressPercentage);
-            console.log(`Train following ${trackInfo.isDirect ? 'direct' : 'multi-hop'} track: ${trackInfo.trackId}`);
-          } else {
-            // Fallback to direct interpolation
-            const currentStopCoords = getStationCoordinates(currentStop.Station_ID, networkData);
-            const nextStopCoords = getStationCoordinates(nextStop.Station_ID, networkData);
-            position = {
-              x: currentStopCoords.x + (nextStopCoords.x - currentStopCoords.x) * progressPercentage,
-              y: currentStopCoords.y + (nextStopCoords.y - currentStopCoords.y) * progressPercentage
-            };
-          }
-        } else {
-          // No track found - use direct line as fallback
-          console.warn(`No track found between ${currentStop.Station_ID} and ${nextStop.Station_ID} - using direct route`);
-          const currentStopCoords = getStationCoordinates(currentStop.Station_ID, networkData);
-          const nextStopCoords = getStationCoordinates(nextStop.Station_ID, networkData);
-          position = {
-            x: currentStopCoords.x + (nextStopCoords.x - currentStopCoords.x) * progressPercentage,
-            y: currentStopCoords.y + (nextStopCoords.y - currentStopCoords.y) * progressPercentage
-          };
-          console.log(`Train ${train.Train_ID} interpolated position:`, {
-            currentStop: currentStop.Station_ID,
-            nextStop: nextStop.Station_ID,
-            progress: progressPercentage,
-            position,
-            currentStopCoords,
-            nextStopCoords
-          });
+        // Calculate position for the simulation - keep it simple, let visualization handle edges
+        const currentStopCoords = getStationCoordinates(currentStop.Station_ID, networkData);
+        const nextStopCoords = getStationCoordinates(nextStop.Station_ID, networkData);
+        position = {
+          x: currentStopCoords.x + (nextStopCoords.x - currentStopCoords.x) * progressPercentage,
+          y: currentStopCoords.y + (nextStopCoords.y - nextStopCoords.y) * progressPercentage
+        };
+        
+        // Log track info for debugging
+        if (trackInfo && Math.random() < 0.02) { // 2% of the time
+          console.log(`Train ${train.Train_ID} following ${trackInfo.isDirect ? 'direct' : 'multi-hop'} track: ${trackInfo.trackId}`);
         }
 
         const status = train.Initial_Reported_Delay_Mins > 0 ? 'Delayed' : 'En-Route';

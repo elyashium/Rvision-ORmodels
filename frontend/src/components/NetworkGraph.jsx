@@ -109,13 +109,17 @@ const NetworkGraph = ({
       // Get the vis-network body for accessing edge geometry
       const network = networkInstance.current;
       
+      // Normalize station IDs for edge lookup
+      const normalizedFrom = normalizeStationId(fromStationId);
+      const normalizedTo = normalizeStationId(toStationId);
+      
       // Try different edge ID patterns to find the correct edge
       const possibleEdgeIds = [
-        `${fromStationId}_${toStationId}_MAIN`,
-        `${toStationId}_${fromStationId}_MAIN`,
-        `${fromStationId}_${toStationId}_ALT`,
-        `${toStationId}_${fromStationId}_ALT`,
-        `${fromStationId}_${toStationId}`,
+        `${normalizedFrom}_${normalizedTo}_MAIN`,
+        `${normalizedTo}_${normalizedFrom}_MAIN`,
+        `${normalizedFrom}_${normalizedTo}_ALT`,
+        `${normalizedTo}_${normalizedFrom}_ALT`,
+        `${normalizedFrom}_${normalizedTo}`,
         `${toStationId}_${fromStationId}`
       ];
       
@@ -131,13 +135,13 @@ const NetworkGraph = ({
         }
       }
       
-      // If not found, search through all edges
+      // If not found, search through all edges with normalized IDs
       if (!edgeObject) {
         for (const [edgeId, edge] of Object.entries(network.body.edges)) {
           const edgeData = network.body.data.edges.get(edgeId);
           if (edgeData && 
-              ((edgeData.from === fromStationId && edgeData.to === toStationId) ||
-               (edgeData.from === toStationId && edgeData.to === fromStationId))) {
+              ((edgeData.from === normalizedFrom && edgeData.to === normalizedTo) ||
+               (edgeData.from === normalizedTo && edgeData.to === normalizedFrom))) {
             targetEdgeId = edgeId;
             edgeObject = edge;
             break;
@@ -159,8 +163,8 @@ const NetworkGraph = ({
         return null;
       }
       
-      // Determine correct direction based on station IDs
-      const isForward = edgeObject.fromId === fromStationId;
+      // Determine correct direction based on normalized station IDs
+      const isForward = edgeObject.fromId === normalizedFrom;
       
       return {
         from: { x: fromNode.x, y: fromNode.y },
@@ -174,13 +178,29 @@ const NetworkGraph = ({
     }
   };
 
+  // Helper function to normalize station IDs for network graph compatibility
+  const normalizeStationId = (stationId) => {
+    const stationMapping = {
+      'Anand_Vihar': 'ANVR',
+      'Ghaziabad': 'GZB', 
+      'New_Delhi': 'NDLS',
+      'Sahibabad': 'SBB',
+      'Vivek_Vihar': 'VVB',
+      'Shaheed_Nagar': 'SHZM',
+      'Old_Delhi': 'DLI',
+      'Meerut': 'MUT'
+    };
+    return stationMapping[stationId] || stationId;
+  };
+
   // Function to get station position from vis-network
   const getStationVisualPosition = (stationId) => {
     if (!networkInstance.current) return null;
     
     try {
       const network = networkInstance.current;
-      const node = network.body.nodes[stationId];
+      const normalizedId = normalizeStationId(stationId);
+      const node = network.body.nodes[normalizedId];
       
       if (node) {
         return { x: node.x, y: node.y };
@@ -192,14 +212,9 @@ const NetworkGraph = ({
     return null;
   };
 
-  // Function to interpolate along visual edge
+  // Function to interpolate along visual edge - ALWAYS follow actual network edges
   const interpolateAlongVisualEdge = (train) => {
-    // First, try to use the simulation-calculated position if available
-    if (train.currentPosition && train.currentPosition.x !== undefined && train.currentPosition.y !== undefined) {
-      return train.currentPosition;
-    }
-
-    // If train is at a station (not moving), get station position
+    // If train is at a station (not moving), get station position from vis-network
     if (train.isAtStation && train.currentStop) {
       const stationPos = getStationVisualPosition(train.currentStop.Station_ID);
       if (stationPos) {
@@ -207,20 +222,46 @@ const NetworkGraph = ({
       }
     }
     
-    // If train is moving between stations
+    // If train is moving between stations - MUST follow visual edges
     if (train.currentStop && train.nextStop && train.progressPercentage !== undefined) {
-      // Try visual edge geometry first
+      // ALWAYS try to get the visual edge geometry first
       const edgeGeometry = getVisualEdgeGeometry(train.currentStop.Station_ID, train.nextStop.Station_ID);
       
       if (edgeGeometry) {
-        // Interpolate along the actual visual edge
+        // Use the actual visual edge path - follow the exact rendered edge
         const progress = train.progressPercentage;
+        
+        // Get the actual edge object for precise path following
+        const network = networkInstance.current;
+        const edgeObject = network.body.edges[edgeGeometry.edgeId];
+        
+        if (edgeObject && edgeObject.edgeType) {
+          try {
+            // Use vis-network's built-in getPoint method for exact edge following
+            const point = edgeObject.edgeType.getPoint(progress);
+            if (point && point.x !== undefined && point.y !== undefined) {
+              // Debug occasionally
+              if (Math.random() < 0.05) {
+                console.log(`Train following exact edge path: ${edgeGeometry.edgeId}, progress: ${progress.toFixed(3)}, point:`, point);
+              }
+              return { x: point.x, y: point.y };
+            }
+          } catch (error) {
+            // Fallback to basic interpolation if getPoint fails
+            if (Math.random() < 0.1) {
+              console.log(`getPoint failed for ${edgeGeometry.edgeId}, using basic interpolation:`, error);
+            }
+          }
+        } else if (Math.random() < 0.1) {
+          console.log(`No edgeType found for ${edgeGeometry.edgeId}, using basic interpolation`);
+        }
+        
+        // Fallback: basic interpolation between endpoints
         const x = edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * progress;
         const y = edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * progress;
-        
         return { x, y };
       } else {
-        // Fallback to simple interpolation between stations
+        // If no visual edge found, fall back to station positions
         const fromStation = getStationVisualPosition(train.currentStop.Station_ID);
         const toStation = getStationVisualPosition(train.nextStop.Station_ID);
         
@@ -228,10 +269,16 @@ const NetworkGraph = ({
           const progress = train.progressPercentage;
           const x = fromStation.x + (toStation.x - fromStation.x) * progress;
           const y = fromStation.y + (toStation.y - fromStation.y) * progress;
-          
           return { x, y };
         }
       }
+    }
+    
+    // Use simulation-calculated position as last resort, but validate it
+    if (train.currentPosition && 
+        train.currentPosition.x !== undefined && 
+        train.currentPosition.y !== undefined) {
+      return train.currentPosition;
     }
     
     // Fallback: try to get current station position
@@ -244,6 +291,72 @@ const NetworkGraph = ({
     
     // Ultimate fallback to origin
     return { x: 0, y: 0 };
+  };
+
+  // Function to get station position from network data (consistent with network graph)
+  const getNetworkStationPosition = (stationId) => {
+    if (networkData && networkData.stations && networkData.stations[stationId]) {
+      const coords = networkData.stations[stationId].coordinates;
+      // Use same conversion as in getNetworkData
+      const x = (coords.lon - 77.2197) * 10000;
+      const y = (coords.lat - 28.6431) * 10000;
+      return { x, y };
+    }
+    
+    // Fallback to hardcoded positions (should match network graph)
+    const fallbackCoords = {
+      'NDLS': { x: 0, y: 0 },
+      'ANVR': { x: 953, y: 38 },
+      'GZB': { x: 2341, y: 261 },
+      'SBB': { x: 1471, y: 300 },
+      'VVB': { x: 960, y: 311 },
+      'SHZM': { x: 636, y: 136 },
+      'DLI': { x: 22, y: 86 },
+      'MUT': { x: 4867, y: 3414 }
+    };
+    
+    return fallbackCoords[stationId] || { x: 0, y: 0 };
+  };
+
+  // Function to find the best track route between two stations
+  const findTrackRoute = (fromStation, toStation) => {
+    if (!networkData || !networkData.tracks) return null;
+    
+    // First try direct track
+    for (const [trackId, track] of Object.entries(networkData.tracks)) {
+      if (track.from === fromStation && track.to === toStation) {
+        return {
+          tracks: [trackId],
+          direct: true,
+          stations: [fromStation, toStation]
+        };
+      }
+    }
+    
+    // Try route alternatives if available
+    if (networkData.route_alternatives) {
+      const routeKey = `${fromStation}_to_${toStation}`;
+      const routeInfo = networkData.route_alternatives[routeKey];
+      
+      if (routeInfo && routeInfo.primary) {
+        // Get intermediate stations from the track sequence
+        const stations = [fromStation];
+        for (const trackId of routeInfo.primary) {
+          const track = networkData.tracks[trackId];
+          if (track && !stations.includes(track.to)) {
+            stations.push(track.to);
+          }
+        }
+        
+        return {
+          tracks: routeInfo.primary,
+          direct: false,
+          stations: stations
+        };
+      }
+    }
+    
+    return null;
   };
 
   // Step 5: Function to update train visualization based on simulation data
@@ -268,34 +381,67 @@ const NetworkGraph = ({
       // Calculate position using multiple fallback methods
       let visualPosition = interpolateAlongVisualEdge(train);
       
-      // Backup animation: simple movement for prototype demo
+      // Backup animation: follow visual edges when possible
       if (!visualPosition || (visualPosition.x === 0 && visualPosition.y === 0)) {
-        // Use simple animation between predefined station positions
-        const stationPositions = {
-          'NDLS': { x: 0, y: 0 },
-          'ANVR': { x: 300, y: -50 },
-          'GZB': { x: 600, y: 0 },
-          'SBB': { x: 500, y: 150 },
-          'VVB': { x: 300, y: 100 },
-          'SHZM': { x: 150, y: 75 },
-          'DLI': { x: -100, y: 50 },
-          'MUT': { x: 800, y: -100 }
-        };
-        
         const route = train.route || [];
         if (route.length >= 2) {
           const firstStation = route[0]?.Station_ID;
           const lastStation = route[route.length - 1]?.Station_ID;
-          const start = stationPositions[firstStation] || { x: 0, y: 0 };
-          const end = stationPositions[lastStation] || { x: 600, y: 0 };
           
-          // Use time-based animation for demo - ensure continuous movement
-          const now = Date.now();
-          const animationProgress = ((now / 5000) % 1); // 5-second loop for better visibility
-          visualPosition = {
-            x: start.x + (end.x - start.x) * animationProgress,
-            y: start.y + (end.y - start.y) * animationProgress
-          };
+          // Try to use visual edge geometry for backup animation too
+          const edgeGeometry = getVisualEdgeGeometry(firstStation, lastStation);
+          
+          if (edgeGeometry) {
+            // Use time-based animation along the actual visual edge
+            const now = Date.now();
+            const animationProgress = ((now / 8000) % 1); // 8-second loop
+            
+            // Try to use the exact edge path
+            const network = networkInstance.current;
+            const edgeObject = network.body.edges[edgeGeometry.edgeId];
+            
+            if (edgeObject && edgeObject.edgeType) {
+              try {
+                const point = edgeObject.edgeType.getPoint(animationProgress);
+                if (point && point.x !== undefined && point.y !== undefined) {
+                  visualPosition = { x: point.x, y: point.y };
+                } else {
+                  // Fallback to linear interpolation
+                  visualPosition = {
+                    x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * animationProgress,
+                    y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * animationProgress
+                  };
+                }
+              } catch (error) {
+                // Fallback to linear interpolation
+                visualPosition = {
+                  x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * animationProgress,
+                  y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * animationProgress
+                };
+              }
+            } else {
+              // Fallback to linear interpolation
+              visualPosition = {
+                x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * animationProgress,
+                y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * animationProgress
+              };
+            }
+          } else {
+            // Fall back to station positions
+            const start = getStationVisualPosition(firstStation);
+            const end = getStationVisualPosition(lastStation);
+            
+            if (start && end) {
+              const now = Date.now();
+              const animationProgress = ((now / 8000) % 1);
+              visualPosition = {
+                x: start.x + (end.x - start.x) * animationProgress,
+                y: start.y + (end.y - start.y) * animationProgress
+              };
+            } else {
+              visualPosition = { x: 0, y: 0 };
+            }
+          }
         } else {
           visualPosition = { x: 0, y: 0 };
         }

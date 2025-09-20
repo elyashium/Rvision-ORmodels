@@ -394,9 +394,20 @@ class RailwayNetwork:
             for train in self.trains.values():
                 # Calculate adjusted departure/arrival times based on delays
                 try:
-                    base_departure = datetime.strptime(train.scheduled_departure_time, "%H:%M:%S")
-                    base_arrival = datetime.strptime(train.scheduled_arrival_time, "%H:%M:%S")
+                    # Use today's date as the base for creating full datetime objects
+                    today_str = datetime.now().strftime("%Y-%m-%d")
                     
+                    # Handle both full datetime and time-only strings gracefully
+                    try:
+                        base_departure = datetime.strptime(train.scheduled_departure_time, "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        base_departure = datetime.strptime(f"{today_str} {train.scheduled_departure_time}", "%Y-%m-%d %H:%M:%S")
+
+                    try:
+                        base_arrival = datetime.strptime(train.scheduled_arrival_time, "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        base_arrival = datetime.strptime(f"{today_str} {train.scheduled_arrival_time}", "%Y-%m-%d %H:%M:%S")
+
                     # Apply delays
                     actual_departure = base_departure + timedelta(minutes=train.actual_delay_mins)
                     actual_arrival = base_arrival + timedelta(minutes=train.actual_delay_mins)
@@ -415,8 +426,8 @@ class RailwayNetwork:
                                 route.append({
                                     "Station_ID": station,
                                     "Station_Name": station,
-                                    "Arrival_Time": actual_departure.strftime("%H:%M:%S"),
-                                    "Departure_Time": actual_departure.strftime("%H:%M:%S"),
+                                    "Arrival_Time": None,
+                                    "Departure_Time": actual_departure.strftime("%Y-%m-%d %H:%M:%S"),
                                     "Platform": "1"
                                 })
                             elif i == len(stations) - 1:
@@ -424,8 +435,8 @@ class RailwayNetwork:
                                 route.append({
                                     "Station_ID": station,
                                     "Station_Name": station,
-                                    "Arrival_Time": actual_arrival.strftime("%H:%M:%S"),
-                                    "Departure_Time": actual_arrival.strftime("%H:%M:%S"),
+                                    "Arrival_Time": actual_arrival.strftime("%Y-%m-%d %H:%M:%S"),
+                                    "Departure_Time": None,
                                     "Platform": "1"
                                 })
                             else:
@@ -436,8 +447,8 @@ class RailwayNetwork:
                                 route.append({
                                     "Station_ID": station,
                                     "Station_Name": station,
-                                    "Arrival_Time": station_time.strftime("%H:%M:%S"),
-                                    "Departure_Time": (station_time + timedelta(minutes=2)).strftime("%H:%M:%S"),  # 2 min stop
+                                    "Arrival_Time": station_time.strftime("%Y-%m-%d %H:%M:%S"),
+                                    "Departure_Time": (station_time + timedelta(minutes=2)).strftime("%Y-%m-%d %H:%M:%S"),  # 2 min stop
                                     "Platform": "1"
                                 })
                     else:
@@ -446,34 +457,36 @@ class RailwayNetwork:
                             {
                                 "Station_ID": train.section_start,
                                 "Station_Name": train.section_start,
-                                "Arrival_Time": actual_departure.strftime("%H:%M:%S"),
-                                "Departure_Time": actual_departure.strftime("%H:%M:%S"),
+                                "Arrival_Time": None,
+                                "Departure_Time": actual_departure.strftime("%Y-%m-%d %H:%M:%S"),
                                 "Platform": "1"
                             },
                             {
                                 "Station_ID": train.section_end,
                                 "Station_Name": train.section_end,
-                                "Arrival_Time": actual_arrival.strftime("%H:%M:%S"),
-                                "Departure_Time": actual_arrival.strftime("%H:%M:%S"),
+                                "Arrival_Time": actual_arrival.strftime("%Y-%m-%d %H:%M:%S"),
+                                "Departure_Time": None,
                                 "Platform": "1"
                             }
                         ]
                     
-                except ValueError:
+                except Exception as e:
+                    print(f"Warning: Could not parse time for train {train.id}, using fallback. Error: {e}")
                     # Fallback for invalid time formats
+                    today_str = datetime.now().strftime("%Y-%m-%d")
                     route = [
                         {
                             "Station_ID": train.section_start,
                             "Station_Name": train.section_start,
-                            "Arrival_Time": "06:00:00",
-                            "Departure_Time": "06:00:00",
+                            "Arrival_Time": None,
+                            "Departure_Time": f"{today_str} 06:00:00",
                             "Platform": "1"
                         },
                         {
                             "Station_ID": train.section_end,
                             "Station_Name": train.section_end,
-                            "Arrival_Time": "08:00:00",
-                            "Departure_Time": "08:00:00",
+                            "Arrival_Time": f"{today_str} 08:00:00",
+                            "Departure_Time": None,
                             "Platform": "1"
                         }
                     ]

@@ -638,76 +638,41 @@ export const useTrainSimulation = () => {
     }
   }, [preprocessTrainData]);
 
-  // Step 4: Enhanced simulation loop for multi-stop journeys
+  // Step 4: Refactored simulation loop for stability and correctness
+  // Effect 1: Advances the simulation time when running
   useEffect(() => {
-    if (!isRunning || !simulationTime) {
-      console.log('Simulation not running or no simulation time set:', { isRunning, simulationTime });
-      return;
-    }
-
-    console.log('Starting simulation loop with time:', simulationTime.toISOString(), 'Speed:', simulationSpeed);
+    if (!isRunning) return;
 
     const intervalId = setInterval(() => {
       setSimulationTime(prevTime => {
-        if (!prevTime) {
-          console.warn('Previous simulation time is null, stopping simulation');
-          return prevTime;
-        }
-        
-        // Advance simulation time: speed is multiplier (1000x = 1000 minutes per minute)
-        // 50ms interval * speed / 1000 = actual minutes to advance
-        const minutesToAdvance = (50 * simulationSpeed) / (1000 * 60); // Convert to actual minutes
-        const newTime = new Date(prevTime.getTime() + (minutesToAdvance * 60 * 1000));
-        
-        // Debug logging (reduce frequency)
-        if (Math.random() < 0.1) { // Log 10% of the time to reduce spam
-          console.log('Simulation time advanced:', {
-            prevTime: prevTime.toISOString(),
-            newTime: newTime.toISOString(),
-            minutesAdvanced: minutesToAdvance.toFixed(2)
-          });
-        }
-        
-        // Update train positions based on the new simulation time
-        setTrains(prevTrains => {
-          if (!prevTrains || prevTrains.length === 0) {
-            console.warn('No trains to update');
-            return prevTrains;
-          }
-          
-          // Always preserve all trains, just update their positions and state
-          return prevTrains.map(train => {
-            try {
-              const positionData = calculateTrainPosition(train, newTime, networkData);
-              return {
-                ...train, // Preserve all existing train data
-                currentStatus: positionData.status,
-                currentPosition: positionData.position,
-                currentStop: positionData.currentStop,
-                nextStop: positionData.nextStop,
-                isAtStation: positionData.isAtStation,
-                stationInfo: positionData.stationInfo,
-                progressPercentage: positionData.progressPercentage || train.progressPercentage || 0,
-                hasStarted: positionData.hasStarted !== undefined ? positionData.hasStarted : train.hasStarted,
-                hasCompleted: positionData.hasCompleted !== undefined ? positionData.hasCompleted : train.hasCompleted,
-                trackId: positionData.trackId || train.trackId
-              };
-            } catch (error) {
-              console.error(`Error calculating position for train ${train.Train_ID}:`, error);
-              return train; // Return unchanged train on error
-            }
-          });
-        });
-        
-        return newTime;
+        if (!prevTime) return new Date(); // Safety check
+        const minutesToAdvance = (50 * simulationSpeed) / (1000 * 60);
+        return new Date(prevTime.getTime() + minutesToAdvance * 60 * 1000);
       });
-    }, 50); // Tick every 50ms
+    }, 50); // Tick every 50ms for smooth animation
 
-    return () => {
-      console.log('Cleaning up simulation interval');
-      clearInterval(intervalId);
-    };
-  }, [isRunning, networkData, simulationSpeed, calculateTrainPosition]); // Keep minimal dependencies
+    return () => clearInterval(intervalId);
+  }, [isRunning, simulationSpeed]);
+
+  // Effect 2: Updates train positions whenever the simulation time changes
+  useEffect(() => {
+    if (!isRunning || !simulationTime || !networkData) return;
+
+    setTrains(prevTrains =>
+      prevTrains.map(train => {
+        try {
+          const positionData = calculateTrainPosition(train, simulationTime, networkData);
+          // Combine new position data with existing train data
+          return { ...train, ...positionData };
+        } catch (error) {
+          if (Math.random() < 0.01) { // Log errors sparingly
+            console.error(`Error calculating position for train ${train.Train_ID}:`, error);
+          }
+          return train; // Return unchanged train on error
+        }
+      })
+    );
+  }, [simulationTime, isRunning, networkData, calculateTrainPosition]); // Re-runs ONLY when time changes
 
   // Control functions
   const startSimulation = useCallback(() => {

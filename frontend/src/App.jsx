@@ -343,6 +343,42 @@ function App() {
               simulationSpeed={simulationSpeed}
               setSimulationSpeed={setSimulationSpeed}
               onResetSimulation={resetSimulation}
+              // Pass panel content for consistent layout
+              leftPanelContent={
+                <ControlPanel
+                  networkState={networkState}
+                  isSimulationRunning={isSimulationRunning}
+                  onScheduleUploaded={handleScheduleUploaded}
+                  onSimulationStart={handleSimulationStart}
+                  onSimulationStop={handleSimulationStop}
+                  onDisruptionReported={handleDisruptionReported}
+                  simulationTrains={simulationTrains}
+                  simulationTime={simulationTime}
+                  simulationSpeed={simulationSpeed}
+                  setSimulationSpeed={setSimulationSpeed}
+                  onResetSimulation={resetSimulation}
+                />
+              }
+              rightPanelContent={
+                multiStrategySimulations ? (
+                  <MultiStrategySimulation
+                    simulations={multiStrategySimulations}
+                    onImplementStrategy={handleImplementStrategy}
+                    isImplementing={isImplementingStrategy}
+                  />
+                ) : (
+                  <AlertsAndRecommendations
+                    alerts={alerts}
+                    recommendations={recommendations}
+                    onAcceptRecommendation={(recommendation) => {
+                      addAlert('success', 'Recommendation accepted', recommendation.recommendation?.recommendation_text);
+                    }}
+                    onRejectRecommendation={(recommendation) => {
+                      addAlert('info', 'Recommendation rejected', 'Manual override applied');
+                    }}
+                  />
+                )
+              }
             />
           </div>
 

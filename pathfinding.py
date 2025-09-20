@@ -170,12 +170,14 @@ class RouteOptimizer:
         """
         Dijkstra's algorithm implementation for railway pathfinding.
         """
-        # Priority queue: (cost, current_station, path_segments)
-        pq = [(0, origin, [])]
+        # Priority queue: (cost, entry_count, current_station, path_segments)
+        # entry_count is a tie-breaker to prevent comparison of RouteSegment objects
+        entry_count = 0
+        pq = [(0, entry_count, origin, [])]
         visited = set()
         
         while pq:
-            current_cost, current_station, path_segments = heapq.heappop(pq)
+            current_cost, _, current_station, path_segments = heapq.heappop(pq)
             
             if current_station in visited:
                 continue
@@ -210,7 +212,8 @@ class RouteOptimizer:
                     )
                     
                     new_path = path_segments + [segment]
-                    heapq.heappush(pq, (new_cost, neighbor, new_path))
+                    entry_count += 1
+                    heapq.heappush(pq, (new_cost, entry_count, neighbor, new_path))
         
         return []  # No path found
     

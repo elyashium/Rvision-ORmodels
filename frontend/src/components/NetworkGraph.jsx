@@ -220,184 +220,108 @@ const NetworkGraph = ({
     return null;
   };
 
-  // SIMPLE: Just get trains moving on visible tracks
+  // FINAL FIX: Simple, robust positioning for all simulations
   const getTrainPosition = (train) => {
-    const now = Date.now();
-    const speed = currentStrategy === 'punctuality' ? 6000 : 
-                  currentStrategy === 'throughput' ? 4000 :
-                  currentStrategy === 'balanced' ? 8000 : 10000;
-    const progress = ((now / speed) % 1);
-    
-    // Get start and end stations
-    let fromStation, toStation;
-    
+    // Determine start and end times from schedule data for progress calculation
+    let startTime, endTime;
     if (train.route && train.route.length >= 2) {
-      // Use first and last station from route
-      fromStation = train.route[0].Station_ID;
-      toStation = train.route[train.route.length - 1].Station_ID;
+      const firstStop = train.route[0];
+      const lastStop = train.route[train.route.length - 1];
+      if (!firstStop.Departure_Time || !lastStop.Arrival_Time) return { x: 0, y: 0 };
+      startTime = new Date(firstStop.Departure_Time);
+      endTime = new Date(lastStop.Arrival_Time);
     } else {
-      // Use Section_Start and Section_End
-      fromStation = normalizeStationId(train.Section_Start || train.section_start);
-      toStation = normalizeStationId(train.Section_End || train.section_end);
+      if (!train.Scheduled_Departure_Time || !train.Scheduled_Arrival_Time) return { x: 0, y: 0 };
+      startTime = new Date(train.Scheduled_Departure_Time);
+      endTime = new Date(train.Scheduled_Arrival_Time);
     }
-    
-    if (!fromStation || !toStation) {
-      return { x: 0, y: 0 };
+
+    if (train.Initial_Reported_Delay_Mins > 0) {
+      startTime.setMinutes(startTime.getMinutes() + train.Initial_Reported_Delay_Mins);
+      endTime.setMinutes(endTime.getMinutes() + train.Initial_Reported_Delay_Mins);
     }
-    
-    // Try to find a direct visual edge first
-    let edgeGeometry = getVisualEdgeGeometry(fromStation, toStation);
-    
-    // If no direct edge, use the main route (NDLS -> ANVR -> GZB)
-    if (!edgeGeometry && fromStation === 'NDLS' && toStation === 'GZB') {
-      // For NDLS to GZB, use ANVR as intermediate
-      if (progress < 0.5) {
-        // First half: NDLS -> ANVR
-        edgeGeometry = getVisualEdgeGeometry('NDLS', 'ANVR');
-        const legProgress = progress * 2; // Scale to 0-1 for this leg
-        
-        if (edgeGeometry) {
-          const network = networkInstance.current;
-          const edgeObject = network.body.edges[edgeGeometry.edgeId];
-          
-          if (edgeObject && edgeObject.edgeType && edgeObject.edgeType.getPoint) {
-            try {
-              const point = edgeObject.edgeType.getPoint(legProgress);
-              if (point && point.x !== undefined && point.y !== undefined) {
-                return { x: point.x, y: point.y };
-              }
-            } catch (error) {}
-          }
-          
-          return {
-            x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * legProgress,
-            y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * legProgress
-          };
-        }
-      } else {
-        // Second half: ANVR -> GZB
-        edgeGeometry = getVisualEdgeGeometry('ANVR', 'GZB');
-        const legProgress = (progress - 0.5) * 2; // Scale to 0-1 for this leg
-        
-        if (edgeGeometry) {
-          const network = networkInstance.current;
-          const edgeObject = network.body.edges[edgeGeometry.edgeId];
-          
-          if (edgeObject && edgeObject.edgeType && edgeObject.edgeType.getPoint) {
-            try {
-              const point = edgeObject.edgeType.getPoint(legProgress);
-              if (point && point.x !== undefined && point.y !== undefined) {
-                return { x: point.x, y: point.y };
-              }
-            } catch (error) {}
-          }
-          
-          return {
-            x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * legProgress,
-            y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * legProgress
-          };
-        }
+
+    // Calculate finite progress (0 before start, 1 after end)
+    let progress = 0;
+    if (simulationTime && startTime < endTime) {
+      if (simulationTime >= endTime) progress = 1;
+      else if (simulationTime > startTime) {
+        progress = (simulationTime.getTime() - startTime.getTime()) / (endTime.getTime() - startTime.getTime());
       }
     }
+
+    // Determine the journey's stations
+    let fromStation, toStation;
+    let route = train.route || [];
+    if (route.length >= 2) {
+      fromStation = route[0].Station_ID;
+      toStation = route[route.length - 1].Station_ID;
+    } else {
+      fromStation = normalizeStationId(train.Section_Start);
+      toStation = normalizeStationId(train.Section_End);
+    }
+
+    if (!fromStation || !toStation) return { x: 0, y: 0 };
+
+    // --- Pathing Logic ---
+    let currentLegFrom = fromStation;
+    let currentLegTo = toStation;
+    let legProgress = progress;
+
+    // Special multi-leg handling for the specific NDLS -> GZB route
+    if (fromStation === 'NDLS' && toStation === 'GZB') {
+        const ndls_anvr_duration = 25;
+        const anvr_gzb_duration = 30;
+        const totalDuration = ndls_anvr_duration + anvr_gzb_duration;
+        const crossoverPoint = ndls_anvr_duration / totalDuration; // ~0.45
+
+        if (progress < crossoverPoint) {
+            currentLegFrom = 'NDLS';
+            currentLegTo = 'ANVR';
+            legProgress = progress / crossoverPoint;
+        } else {
+            currentLegFrom = 'ANVR';
+            currentLegTo = 'GZB';
+            legProgress = (progress - crossoverPoint) / (1 - crossoverPoint);
+        }
+    }
     
-    // For direct edges or other routes
+    // Find the visual edge for the current leg and interpolate
+    const edgeGeometry = getVisualEdgeGeometry(currentLegFrom, currentLegTo);
     if (edgeGeometry) {
-      const network = networkInstance.current;
-      const edgeObject = network.body.edges[edgeGeometry.edgeId];
-      
-      if (edgeObject && edgeObject.edgeType && edgeObject.edgeType.getPoint) {
-        try {
-          const point = edgeObject.edgeType.getPoint(progress);
-          if (point && point.x !== undefined && point.y !== undefined) {
-            return { x: point.x, y: point.y };
-          }
-        } catch (error) {}
-      }
-      
-      return {
-        x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * progress,
-        y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * progress
-      };
+      return interpolateOnEdge(edgeGeometry, legProgress);
     }
-    
-    // Fallback to station positions
-    const fromPos = getStationVisualPosition(fromStation);
-    const toPos = getStationVisualPosition(toStation);
-    
+
+    // Fallback if no edge is found
+    const fromPos = getStationVisualPosition(currentLegFrom);
+    const toPos = getStationVisualPosition(currentLegTo);
     if (fromPos && toPos) {
       return {
-        x: fromPos.x + (toPos.x - fromPos.x) * progress,
-        y: fromPos.y + (toPos.y - fromPos.y) * progress
+        x: fromPos.x + (toPos.x - fromPos.x) * legProgress,
+        y: fromPos.y + (toPos.y - fromPos.y) * legProgress,
       };
     }
-    
+
+    return getStationVisualPosition(fromStation) || { x: 0, y: 0 };
+  };
+
+  // Helper to interpolate position on a visual edge (re-add this)
+  const interpolateOnEdge = (edgeGeometry, progress) => {
+    const network = networkInstance.current;
+    if (network && edgeGeometry) {
+      const edgeObject = network.body.edges[edgeGeometry.edgeId];
+      if (edgeObject?.edgeType?.getPoint) {
+        try {
+          const point = edgeObject.edgeType.getPoint(progress);
+          if (point?.x !== undefined) return point;
+        } catch (e) { /* silent */ }
+      }
+      return {
+        x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * progress,
+        y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * progress,
+      };
+    }
     return { x: 0, y: 0 };
-  };
-
-  // Function to get station position from network data (consistent with network graph)
-  const getNetworkStationPosition = (stationId) => {
-    if (networkData && networkData.stations && networkData.stations[stationId]) {
-      const coords = networkData.stations[stationId].coordinates;
-      // Use same conversion as in getNetworkData
-      const x = (coords.lon - 77.2197) * 10000;
-      const y = (coords.lat - 28.6431) * 10000;
-      return { x, y };
-    }
-    
-    // Fallback to hardcoded positions (should match network graph)
-    const fallbackCoords = {
-      'NDLS': { x: 0, y: 0 },
-      'ANVR': { x: 953, y: 38 },
-      'GZB': { x: 2341, y: 261 },
-      'SBB': { x: 1471, y: 300 },
-      'VVB': { x: 960, y: 311 },
-      'SHZM': { x: 636, y: 136 },
-      'DLI': { x: 22, y: 86 },
-      'MUT': { x: 4867, y: 3414 }
-    };
-    
-    return fallbackCoords[stationId] || { x: 0, y: 0 };
-  };
-
-  // Function to find the best track route between two stations
-  const findTrackRoute = (fromStation, toStation) => {
-    if (!networkData || !networkData.tracks) return null;
-    
-    // First try direct track
-    for (const [trackId, track] of Object.entries(networkData.tracks)) {
-      if (track.from === fromStation && track.to === toStation) {
-        return {
-          tracks: [trackId],
-          direct: true,
-          stations: [fromStation, toStation]
-        };
-      }
-    }
-    
-    // Try route alternatives if available
-    if (networkData.route_alternatives) {
-      const routeKey = `${fromStation}_to_${toStation}`;
-      const routeInfo = networkData.route_alternatives[routeKey];
-      
-      if (routeInfo && routeInfo.primary) {
-        // Get intermediate stations from the track sequence
-        const stations = [fromStation];
-        for (const trackId of routeInfo.primary) {
-          const track = networkData.tracks[trackId];
-          if (track && !stations.includes(track.to)) {
-            stations.push(track.to);
-          }
-        }
-        
-        return {
-          tracks: routeInfo.primary,
-          direct: false,
-          stations: stations
-        };
-      }
-    }
-    
-    return null;
   };
 
   // SIMPLE: Update train visualization - just follow the tracks!

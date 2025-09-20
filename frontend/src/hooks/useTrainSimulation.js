@@ -12,20 +12,51 @@ export const useTrainSimulation = () => {
 
   // Helper function to find the earliest departure time (Enhanced for new format)
   const findEarliestDepartureTime = (scheduleData) => {
-    if (!scheduleData || scheduleData.length === 0) return new Date();
+    if (!scheduleData || scheduleData.length === 0) {
+      console.warn('No schedule data provided, using current time');
+      return new Date();
+    }
     
     const departureTimes = scheduleData.map(train => {
-      if (train.Route && Array.isArray(train.Route) && train.Route.length > 0) {
-        // New format - get departure time from first route stop
-        const firstStop = train.Route[0];
-        return firstStop.Departure_Time ? new Date(firstStop.Departure_Time) : new Date();
-      } else {
-        // Legacy format
-        return new Date(train.Scheduled_Departure_Time);
+      try {
+        if (train.Route && Array.isArray(train.Route) && train.Route.length > 0) {
+          // New format - get departure time from first route stop
+          const firstStop = train.Route[0];
+          if (firstStop.Departure_Time) {
+            const departureTime = new Date(firstStop.Departure_Time);
+            if (isNaN(departureTime.getTime())) {
+              console.warn(`Invalid departure time for train ${train.Train_ID}:`, firstStop.Departure_Time);
+              return new Date();
+            }
+            return departureTime;
+          }
+        } else if (train.Scheduled_Departure_Time) {
+          // Legacy format
+          const departureTime = new Date(train.Scheduled_Departure_Time);
+          if (isNaN(departureTime.getTime())) {
+            console.warn(`Invalid scheduled departure time for train ${train.Train_ID || train.train_id}:`, train.Scheduled_Departure_Time);
+            return new Date();
+          }
+          return departureTime;
+        }
+        
+        console.warn(`No valid departure time found for train:`, train.Train_ID || train.train_id);
+        return new Date();
+      } catch (error) {
+        console.error(`Error parsing departure time for train ${train.Train_ID || train.train_id}:`, error);
+        return new Date();
       }
     });
     
-    return new Date(Math.min(...departureTimes));
+    const validDepartureTimes = departureTimes.filter(time => !isNaN(time.getTime()));
+    if (validDepartureTimes.length === 0) {
+      console.warn('No valid departure times found, using current time');
+      return new Date();
+    }
+    
+    const earliestTime = new Date(Math.min(...validDepartureTimes));
+    console.log(`Earliest departure time calculated:`, earliestTime.toISOString());
+    return earliestTime;
   };
 
   // Helper function to find track connecting two stations
@@ -234,13 +265,34 @@ export const useTrainSimulation = () => {
       
       if (trainData.Route && Array.isArray(trainData.Route)) {
         // New enhanced schedule format with multi-stop routes
-        processedRoute = trainData.Route.map((stop, index) => ({
-          ...stop,
-          arrivalTime: stop.Arrival_Time ? new Date(stop.Arrival_Time) : null,
-          departureTime: stop.Departure_Time ? new Date(stop.Departure_Time) : null,
-          isOrigin: index === 0,
-          isDestination: index === trainData.Route.length - 1
-        }));
+        processedRoute = trainData.Route.map((stop, index) => {
+          let arrivalTime = null;
+          let departureTime = null;
+          
+          if (stop.Arrival_Time) {
+            arrivalTime = new Date(stop.Arrival_Time);
+            if (isNaN(arrivalTime.getTime())) {
+              console.warn(`Invalid arrival time for station ${stop.Station_ID}:`, stop.Arrival_Time);
+              arrivalTime = null;
+            }
+          }
+          
+          if (stop.Departure_Time) {
+            departureTime = new Date(stop.Departure_Time);
+            if (isNaN(departureTime.getTime())) {
+              console.warn(`Invalid departure time for station ${stop.Station_ID}:`, stop.Departure_Time);
+              departureTime = null;
+            }
+          }
+          
+          return {
+            ...stop,
+            arrivalTime,
+            departureTime,
+            isOrigin: index === 0,
+            isDestination: index === trainData.Route.length - 1
+          };
+        });
 
         // Apply delays to all times
         if (trainData.Initial_Reported_Delay_Mins > 0) {
@@ -375,7 +427,24 @@ export const useTrainSimulation = () => {
       const legDepartureTime = currentStop.departureTime || currentStop.arrivalTime;
       const legArrivalTime = nextStop.arrivalTime;
 
-      if (!legDepartureTime || !legArrivalTime) continue;
+      if (!legDepartureTime || !legArrivalTime) {
+        console.warn(`Missing times for leg ${i}:`, {
+          currentStop: currentStop.Station_ID,
+          nextStop: nextStop.Station_ID,
+          legDepartureTime,
+          legArrivalTime
+        });
+        continue;
+      }
+
+      console.log(`Checking leg ${i} for train ${train.Train_ID}:`, {
+        currentStop: currentStop.Station_ID,
+        nextStop: nextStop.Station_ID,
+        legDepartureTime: legDepartureTime.toISOString(),
+        legArrivalTime: legArrivalTime.toISOString(),
+        currentTime: currentTime.toISOString(),
+        isInLeg: currentTime >= legDepartureTime && currentTime <= legArrivalTime
+      });
 
       // Check if train is between these two stops
       if (currentTime >= legDepartureTime && currentTime <= legArrivalTime) {
@@ -413,6 +482,14 @@ export const useTrainSimulation = () => {
             x: currentStopCoords.x + (nextStopCoords.x - currentStopCoords.x) * progressPercentage,
             y: currentStopCoords.y + (nextStopCoords.y - currentStopCoords.y) * progressPercentage
           };
+          console.log(`Train ${train.Train_ID} interpolated position:`, {
+            currentStop: currentStop.Station_ID,
+            nextStop: nextStop.Station_ID,
+            progress: progressPercentage,
+            position,
+            currentStopCoords,
+            nextStopCoords
+          });
         }
 
         const status = train.Initial_Reported_Delay_Mins > 0 ? 'Delayed' : 'En-Route';
@@ -511,34 +588,62 @@ export const useTrainSimulation = () => {
 
   // Step 4: Enhanced simulation loop for multi-stop journeys
   useEffect(() => {
-    if (!isRunning || !simulationTime) return;
+    if (!isRunning || !simulationTime) {
+      console.log('Simulation not running or no simulation time set:', { isRunning, simulationTime });
+      return;
+    }
+
+    console.log('Starting simulation loop with time:', simulationTime.toISOString(), 'Speed:', simulationSpeed);
 
     const intervalId = setInterval(() => {
-      // Use a ref to track current simulation time to avoid stale closures
-      const currentTime = new Date();
-      
       setSimulationTime(prevTime => {
-        if (!prevTime) return currentTime;
-        const newTime = new Date(prevTime.getTime() + (1000 * simulationSpeed / 60)); // Advance by scaled minute
+        if (!prevTime) {
+          console.warn('Previous simulation time is null, stopping simulation');
+          return prevTime;
+        }
+        
+        // Advance simulation time: speed is multiplier (1000x = 1000 minutes per minute)
+        // 50ms interval * speed / 1000 = actual minutes to advance
+        const minutesToAdvance = (50 * simulationSpeed) / (1000 * 60); // Convert to actual minutes
+        const newTime = new Date(prevTime.getTime() + (minutesToAdvance * 60 * 1000));
+        
+        // Debug logging (reduce frequency)
+        if (Math.random() < 0.1) { // Log 10% of the time to reduce spam
+          console.log('Simulation time advanced:', {
+            prevTime: prevTime.toISOString(),
+            newTime: newTime.toISOString(),
+            minutesAdvanced: minutesToAdvance.toFixed(2)
+          });
+        }
         
         // Update train positions based on the new simulation time
         setTrains(prevTrains => {
+          if (!prevTrains || prevTrains.length === 0) {
+            console.warn('No trains to update');
+            return prevTrains;
+          }
+          
           // Always preserve all trains, just update their positions and state
           return prevTrains.map(train => {
-            const positionData = calculateTrainPosition(train, newTime, networkData);
-            return {
-              ...train, // Preserve all existing train data
-              currentStatus: positionData.status,
-              currentPosition: positionData.position,
-              currentStop: positionData.currentStop,
-              nextStop: positionData.nextStop,
-              isAtStation: positionData.isAtStation,
-              stationInfo: positionData.stationInfo,
-              progressPercentage: positionData.progressPercentage || train.progressPercentage || 0,
-              hasStarted: positionData.hasStarted !== undefined ? positionData.hasStarted : train.hasStarted,
-              hasCompleted: positionData.hasCompleted !== undefined ? positionData.hasCompleted : train.hasCompleted,
-              trackId: positionData.trackId || train.trackId
-            };
+            try {
+              const positionData = calculateTrainPosition(train, newTime, networkData);
+              return {
+                ...train, // Preserve all existing train data
+                currentStatus: positionData.status,
+                currentPosition: positionData.position,
+                currentStop: positionData.currentStop,
+                nextStop: positionData.nextStop,
+                isAtStation: positionData.isAtStation,
+                stationInfo: positionData.stationInfo,
+                progressPercentage: positionData.progressPercentage || train.progressPercentage || 0,
+                hasStarted: positionData.hasStarted !== undefined ? positionData.hasStarted : train.hasStarted,
+                hasCompleted: positionData.hasCompleted !== undefined ? positionData.hasCompleted : train.hasCompleted,
+                trackId: positionData.trackId || train.trackId
+              };
+            } catch (error) {
+              console.error(`Error calculating position for train ${train.Train_ID}:`, error);
+              return train; // Return unchanged train on error
+            }
           });
         });
         
@@ -546,7 +651,10 @@ export const useTrainSimulation = () => {
       });
     }, 50); // Tick every 50ms
 
-    return () => clearInterval(intervalId);
+    return () => {
+      console.log('Cleaning up simulation interval');
+      clearInterval(intervalId);
+    };
   }, [isRunning, networkData, simulationSpeed, calculateTrainPosition]); // Keep minimal dependencies
 
   // Control functions
@@ -626,11 +734,18 @@ export const useTrainSimulation = () => {
         
         // Set simulation time to earliest departure
         const earliestTime = findEarliestDepartureTime(scheduleData);
-        setSimulationTime(earliestTime);
+        
+        if (isNaN(earliestTime.getTime())) {
+          console.error('Invalid earliest time calculated, using current time');
+          setSimulationTime(new Date());
+        } else {
+          setSimulationTime(earliestTime);
+        }
         
         console.log('Strategy simulation loaded successfully:');
         console.log('  - Trains:', processedTrains.length);
-        console.log('  - Start time:', earliestTime);
+        console.log('  - Start time:', earliestTime.toISOString());
+        console.log('  - Sample train route length:', processedTrains[0]?.route?.length);
         console.log('  - Sample train:', processedTrains[0]?.Train_ID);
         
         return { trains: processedTrains };

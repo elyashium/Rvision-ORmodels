@@ -205,6 +205,14 @@ function App() {
               
               addAlert('success', `${strategyData.strategyName} Running`, 
                 `${simulationResult.trains.length} trains - ${actionText}`);
+              
+              // Log detailed information for debugging
+              console.log('Strategy simulation started:', {
+                strategy: strategyData.strategyName,
+                trainCount: simulationResult.trains.length,
+                sampleTrain: simulationResult.trains[0],
+                action: strategyData.applied_action
+              });
             } else {
               addAlert('warning', 'No trains loaded', 'Strategy data issue');
             }

@@ -19,22 +19,37 @@ const SimulationClock = ({
   ];
 
   const formatSimulationTime = (time) => {
-    if (!time) return '--:--:--';
-    return time.toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
+    if (!time || isNaN(time.getTime())) {
+      console.warn('Invalid simulation time provided to clock:', time);
+      return '--:--:--';
+    }
+    try {
+      return time.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+    } catch (error) {
+      console.error('Error formatting simulation time:', error);
+      return '--:--:--';
+    }
   };
 
   const formatDate = (time) => {
-    if (!time) return '';
-    return time.toLocaleDateString([], {
-      weekday: 'short',
-      month: 'short', 
-      day: 'numeric'
-    });
+    if (!time || isNaN(time.getTime())) {
+      return '';
+    }
+    try {
+      return time.toLocaleDateString([], {
+        weekday: 'short',
+        month: 'short', 
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '';
+    }
   };
 
   return (

@@ -20,7 +20,7 @@
       }
     ],
     "status": "Delayed ()",
-    "current_delay_mins": 625,
+    "current_delay_mins": 325,
     "weather": "Clear",
     "track_condition": "Normal",
     "day_of_week": "Monday",
@@ -46,8 +46,8 @@
         "Platform": "1"
       }
     ],
-    "status": "On-Time",
-    "current_delay_mins": 0,
+    "status": "Delayed ()",
+    "current_delay_mins": 300,
     "weather": "Clear",
     "track_condition": "Normal",
     "day_of_week": "Monday",

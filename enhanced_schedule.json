@@ -148,5 +148,68 @@
         "Departure_Time": null
       }
     ]
+  },
+  {
+    "Train_ID": "DEMO_BALANCED",
+    "Train_Type": "Express",
+    "Day_of_Week": "Saturday",
+    "Time_of_Day": "Morning_Peak",
+    "Initial_Reported_Delay_Mins": 0,
+    "Route": [
+      {
+        "Station_ID": "NDLS",
+        "Station_Name": "New Delhi Station",
+        "Arrival_Time": null,
+        "Departure_Time": "2025-09-20 08:15:00"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "Ghaziabad Junction",
+        "Arrival_Time": "2025-09-20 09:15:00",
+        "Departure_Time": null
+      }
+    ]
+  },
+  {
+    "Train_ID": "DEMO_PUNCTUALITY",
+    "Train_Type": "Express",
+    "Day_of_Week": "Saturday",
+    "Time_of_Day": "Morning_Peak",
+    "Initial_Reported_Delay_Mins": 0,
+    "Route": [
+      {
+        "Station_ID": "NDLS",
+        "Station_Name": "New Delhi Station",
+        "Arrival_Time": null,
+        "Departure_Time": "2025-09-20 08:20:00"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "Ghaziabad Junction",
+        "Arrival_Time": "2025-09-20 09:20:00",
+        "Departure_Time": null
+      }
+    ]
+  },
+  {
+    "Train_ID": "DEMO_THROUGHPUT",
+    "Train_Type": "Express",
+    "Day_of_Week": "Saturday",
+    "Time_of_Day": "Morning_Peak",
+    "Initial_Reported_Delay_Mins": 0,
+    "Route": [
+      {
+        "Station_ID": "NDLS",
+        "Station_Name": "New Delhi Station",
+        "Arrival_Time": null,
+        "Departure_Time": "2025-09-20 08:25:00"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "Ghaziabad Junction",
+        "Arrival_Time": "2025-09-20 09:25:00",
+        "Departure_Time": null
+      }
+    ]
   }
 ]

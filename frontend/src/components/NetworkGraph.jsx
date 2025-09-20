@@ -220,7 +220,7 @@ const NetworkGraph = ({
     return null;
   };
 
-  // FINAL FIX: Simple, robust positioning for all simulations
+  // COMPREHENSIVE: Track-following positioning for all simulations
   const getTrainPosition = (train) => {
     // Determine start and end times from schedule data for progress calculation
     let startTime, endTime;
@@ -250,84 +250,139 @@ const NetworkGraph = ({
       }
     }
 
-    // Determine the journey's stations
-    let fromStation, toStation;
-    let route = train.route || [];
-    if (route.length >= 2) {
-      fromStation = route[0].Station_ID;
-      toStation = route[route.length - 1].Station_ID;
-    } else {
-      fromStation = normalizeStationId(train.Section_Start);
-      toStation = normalizeStationId(train.Section_End);
+    // Get the actual route path from train data or determine best visual route
+    const routePath = getVisualRoutePath(train, currentStrategy);
+    if (!routePath || routePath.length === 0) {
+      return { x: 0, y: 0 };
     }
 
-    if (!fromStation || !toStation) return { x: 0, y: 0 };
+    // Calculate position along the visual route path
+    return interpolateAlongVisualRoute(routePath, progress);
+  };
 
-    // --- Pathing Logic ---
-    let currentLegFrom = fromStation;
-    let currentLegTo = toStation;
-    let legProgress = progress;
+  // Get the visual route path that trains should follow
+  const getVisualRoutePath = (train, strategy) => {
+    // Priority 1: Use backend-computed visual route path if available
+    if (train.visual_route_path && train.visual_route_path.length >= 2) {
+      return train.visual_route_path.map(station => normalizeStationId(station));
+    }
 
-    // Dynamic multi-leg handling based on actual route data or available tracks
-    if (fromStation === 'NDLS' && toStation === 'GZB') {
-        // Check if train has a specific route that should be followed
-        if (train.route && train.route.length > 2) {
-            // Use the actual multi-stop route from the train's schedule
-            const routeStations = train.route.map(stop => stop.Station_ID);
-            const currentLegIndex = Math.floor(progress * (routeStations.length - 1));
-            const legStart = Math.min(currentLegIndex, routeStations.length - 2);
-            const legEnd = Math.min(currentLegIndex + 1, routeStations.length - 1);
-            
-            currentLegFrom = normalizeStationId(routeStations[legStart]);
-            currentLegTo = normalizeStationId(routeStations[legEnd]);
-            
-            const segmentProgress = (progress * (routeStations.length - 1)) - currentLegIndex;
-            legProgress = Math.max(0, Math.min(1, segmentProgress));
-        } else {
-            // Check for available direct alternative routes
-            const edgeGeometry = getVisualEdgeGeometry('NDLS', 'SBB'); // Try direct alternative
-            if (edgeGeometry && Math.random() > 0.5) { // 50% chance to use alternative route for variety
-                currentLegFrom = 'NDLS';
-                currentLegTo = 'SBB';
-                legProgress = progress;
-                // Note: Would need additional logic for SBB -> GZB leg
-            } else {
-                // Fallback to main route via ANVR
-                const ndls_anvr_duration = 25;
-                const anvr_gzb_duration = 30;
-                const totalDuration = ndls_anvr_duration + anvr_gzb_duration;
-                const crossoverPoint = ndls_anvr_duration / totalDuration; // ~0.45
+    // Priority 2: Use train's schedule route if multi-stop
+    if (train.route && train.route.length >= 2) {
+      const routeStations = train.route.map(stop => normalizeStationId(stop.Station_ID));
+      if (routeStations.length > 2) {
+        return routeStations;
+      }
+    }
 
-                if (progress < crossoverPoint) {
-                    currentLegFrom = 'NDLS';
-                    currentLegTo = 'ANVR';
-                    legProgress = progress / crossoverPoint;
-                } else {
-                    currentLegFrom = 'ANVR';
-                    currentLegTo = 'GZB';
-                    legProgress = (progress - crossoverPoint) / (1 - crossoverPoint);
-                }
-            }
-        }
+    // Priority 3: Determine route based on strategy and available visual tracks
+    const fromStation = normalizeStationId(train.Section_Start || (train.route && train.route[0]?.Station_ID));
+    const toStation = normalizeStationId(train.Section_End || (train.route && train.route[train.route.length - 1]?.Station_ID));
+    
+    if (!fromStation || !toStation) return [];
+    
+    return getStrategySpecificRoute(fromStation, toStation, strategy);
+  };
+
+  // Get route based on strategy and visual network availability
+  const getStrategySpecificRoute = (fromStation, toStation, strategy) => {
+    // Try to find available visual edges between stations
+    const directEdge = getVisualEdgeGeometry(fromStation, toStation);
+    
+    // Strategy-specific route selection
+    if (strategy === 'throughput') {
+      // Throughput: Prefer direct routes when available
+      if (directEdge) {
+        return [fromStation, toStation];
+      }
+    } else if (strategy === 'punctuality') {
+      // Punctuality: Try alternative routes for variety
+      const alternativeRoutes = getAlternativeVisualRoutes(fromStation, toStation);
+      if (alternativeRoutes.length > 0) {
+        // Use first alternative route
+        return alternativeRoutes[0];
+      }
     }
     
-    // Find the visual edge for the current leg and interpolate
-    const edgeGeometry = getVisualEdgeGeometry(currentLegFrom, currentLegTo);
+    // Default/Balanced: Use main route via intermediate stations
+    if (fromStation === 'NDLS' && toStation === 'GZB') {
+      return ['NDLS', 'ANVR', 'GZB'];
+    } else if (fromStation === 'GZB' && toStation === 'NDLS') {
+      return ['GZB', 'ANVR', 'NDLS'];
+    } else if (fromStation === 'MUT' && toStation === 'NDLS') {
+      return ['MUT', 'GZB', 'ANVR', 'NDLS'];
+    } else if (fromStation === 'NDLS' && toStation === 'MUT') {
+      return ['NDLS', 'ANVR', 'GZB', 'MUT'];
+    }
+    
+    // Fallback to direct route
+    return [fromStation, toStation];
+  };
+
+  // Get alternative visual routes between stations
+  const getAlternativeVisualRoutes = (fromStation, toStation) => {
+    const alternatives = [];
+    
+    if (fromStation === 'NDLS' && toStation === 'GZB') {
+      // Check if alternative route tracks exist visually
+      if (getVisualEdgeGeometry('NDLS', 'SBB') && getVisualEdgeGeometry('SBB', 'GZB')) {
+        alternatives.push(['NDLS', 'SBB', 'GZB']);
+      }
+      if (getVisualEdgeGeometry('NDLS', 'SHZM') && getVisualEdgeGeometry('SHZM', 'ANVR') && getVisualEdgeGeometry('ANVR', 'GZB')) {
+        alternatives.push(['NDLS', 'SHZM', 'ANVR', 'GZB']);
+      }
+    }
+    
+    return alternatives;
+  };
+
+  // Interpolate position along a multi-station visual route
+  const interpolateAlongVisualRoute = (routeStations, progress) => {
+    if (routeStations.length < 2) return { x: 0, y: 0 };
+    if (routeStations.length === 2) {
+      // Simple two-station route
+      const edgeGeometry = getVisualEdgeGeometry(routeStations[0], routeStations[1]);
+      if (edgeGeometry) {
+        return interpolateOnEdge(edgeGeometry, progress);
+      }
+      // Fallback to straight line
+      const fromPos = getStationVisualPosition(routeStations[0]);
+      const toPos = getStationVisualPosition(routeStations[1]);
+      if (fromPos && toPos) {
+        return {
+          x: fromPos.x + (toPos.x - fromPos.x) * progress,
+          y: fromPos.y + (toPos.y - fromPos.y) * progress,
+        };
+      }
+      return { x: 0, y: 0 };
+    }
+
+    // Multi-station route: determine which leg we're on
+    const numLegs = routeStations.length - 1;
+    const legIndex = Math.floor(progress * numLegs);
+    const adjustedLegIndex = Math.min(legIndex, numLegs - 1);
+    const legProgress = (progress * numLegs) - adjustedLegIndex;
+    
+    const currentStation = routeStations[adjustedLegIndex];
+    const nextStation = routeStations[adjustedLegIndex + 1];
+    
+    // Follow the visual edge for this leg
+    const edgeGeometry = getVisualEdgeGeometry(currentStation, nextStation);
     if (edgeGeometry) {
       return interpolateOnEdge(edgeGeometry, legProgress);
     }
-
-    // Fallback if no edge is found
-    const fromPos = getStationVisualPosition(currentLegFrom);
-    const toPos = getStationVisualPosition(currentLegTo);
+    
+    // Fallback to straight line between stations
+    const fromPos = getStationVisualPosition(currentStation);
+    const toPos = getStationVisualPosition(nextStation);
     if (fromPos && toPos) {
       return {
         x: fromPos.x + (toPos.x - fromPos.x) * legProgress,
         y: fromPos.y + (toPos.y - fromPos.y) * legProgress,
       };
     }
-
-    return getStationVisualPosition(fromStation) || { x: 0, y: 0 };
+    
+    return getStationVisualPosition(currentStation) || { x: 0, y: 0 };
   };
 
   // Helper to interpolate position on a visual edge (re-add this)

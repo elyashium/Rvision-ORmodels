@@ -128,7 +128,8 @@ class Train:
             "day_of_week": self.day_of_week,
             "time_of_day": self.time_of_day,
             "weather": self.weather,
-            "track_condition": self.track_condition
+            "track_condition": self.track_condition,
+            "visual_route_path": getattr(self, 'visual_route_path', [self.section_start, self.section_end])
         }
 
     def apply_delay(self, additional_delay_mins: int, reason: str = "Unknown") -> None:
@@ -149,6 +150,13 @@ class Train:
         self.primary_route = primary_route
         self.alternative_routes = alternative_routes or []
         self.current_route = primary_route
+        
+        # Store the visual route path for frontend to follow exact tracks
+        if primary_route and primary_route.segments:
+            self.visual_route_path = [seg.from_station for seg in primary_route.segments] + [primary_route.segments[-1].to_station]
+        else:
+            # Fallback to direct route
+            self.visual_route_path = [self.section_start, self.section_end]
     
     def switch_to_alternative_route(self, route_index: int = 0) -> bool:
         """Switch to an alternative route."""
@@ -158,8 +166,13 @@ class Train:
             self.actual_delay_mins += additional_delay
             self.status = f"Rerouted via {self.current_route.route_type} route"
             
+            # Update visual route path for the new route
+            if self.current_route and self.current_route.segments:
+                self.visual_route_path = [seg.from_station for seg in self.current_route.segments] + [self.current_route.segments[-1].to_station]
+            
             print(f"🔀 {self.get_name()} switched to alternative route {route_index + 1}")
             print(f"   New route: {self.current_route.route_type} via {len(self.current_route.stations)} stations")
+            print(f"   Visual path: {' → '.join(self.visual_route_path)}")
             print(f"   Additional delay: {additional_delay} minutes")
             
             return True

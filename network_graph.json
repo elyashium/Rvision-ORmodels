@@ -185,6 +185,28 @@
       "status": "operational",
       "priority": "medium"
     },
+    "NDLS_SHZM_DIRECT": {
+      "from": "NDLS",
+      "to": "SHZM",
+      "distance_km": 8.3,
+      "max_speed_kmh": 60,
+      "track_type": "single_line",
+      "capacity_trains_per_hour": 6,
+      "travel_time_minutes": 12,
+      "status": "operational",
+      "priority": "medium"
+    },
+    "SHZM_NDLS_DIRECT": {
+      "from": "SHZM",
+      "to": "NDLS",
+      "distance_km": 8.3,
+      "max_speed_kmh": 60,
+      "track_type": "single_line",
+      "capacity_trains_per_hour": 6,
+      "travel_time_minutes": 12,
+      "status": "operational",
+      "priority": "medium"
+    },
     "GZB_MUT_EXTENSION": {
       "from": "GZB",
       "to": "MUT",
@@ -215,7 +237,14 @@
       "primary": ["NDLS_ANVR_MAIN", "ANVR_GZB_MAIN"],
       "alternatives": [
         ["NDLS_SBB_ALT", "SBB_GZB_ALT"],
-        ["NDLS_VVB_BYPASS", "VVB_ANVR_BYPASS", "ANVR_GZB_MAIN"]
+        ["NDLS_VVB_BYPASS", "VVB_ANVR_BYPASS", "ANVR_GZB_MAIN"],
+        ["NDLS_SHZM_DIRECT", "SHZM_ANVR_LOCAL", "ANVR_GZB_MAIN"]
+      ]
+    },
+    "NDLS_to_SHZM": {
+      "primary": ["NDLS_SHZM_DIRECT"],
+      "alternatives": [
+        ["NDLS_DLI_CONNECTOR", "DLI_SHZM_LOCAL"]
       ]
     }
   }

@@ -18,6 +18,7 @@ function App() {
   const [isImplementingStrategy, setIsImplementingStrategy] = useState(false);
   const [systemHealth, setSystemHealth] = useState('healthy');
   const [isNetworkFullscreen, setIsNetworkFullscreen] = useState(false);
+  const [currentStrategy, setCurrentStrategy] = useState(null); // Track current strategy for visualization
 
   // Live simulation state
   const {
@@ -86,6 +87,9 @@ function App() {
   };
 
   const handleScheduleUploaded = async (newNetworkState) => {
+    // Reset to normal simulation (no strategy)
+    setCurrentStrategy(null);
+    
     // If newNetworkState is provided, use legacy mode
     if (newNetworkState) {
       setNetworkState(newNetworkState);
@@ -183,6 +187,9 @@ function App() {
     try {
       // Clear previous alerts to reduce clutter
       setAlerts([]); 
+      
+      // Set current strategy for visualization
+      setCurrentStrategy(strategyData.strategy);
       
       addAlert('info', `Starting ${strategyData.strategyName}`, 'Loading...');
       
@@ -351,6 +358,8 @@ function App() {
                 simulationTrains={simulationTrains}
                 simulationTime={simulationTime}
                 networkData={networkData}
+                // Strategy visualization
+                currentStrategy={currentStrategy}
                 leftPanelContent={
                   <ControlPanel
                     networkState={networkState}
@@ -441,6 +450,8 @@ function App() {
             simulationTrains={simulationTrains}
             simulationTime={simulationTime}
             networkData={networkData}
+            // Strategy visualization
+            currentStrategy={currentStrategy}
             leftPanelContent={
               <ControlPanel
                 networkState={networkState}

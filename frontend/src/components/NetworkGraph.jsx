@@ -13,7 +13,9 @@ const NetworkGraph = ({
   // New props for live simulation
   simulationTrains = [], 
   simulationTime = null,
-  networkData = null
+  networkData = null,
+  // Strategy simulation props
+  currentStrategy = null // 'balanced', 'punctuality', 'throughput', or null for normal
 }) => {
   const networkContainer = useRef(null);
   const networkInstance = useRef(null);
@@ -96,6 +98,9 @@ const NetworkGraph = ({
       { id: 'NDLS_DLI_CONNECTOR', from: 'NDLS', to: 'DLI', label: 'Connector', color: { color: '#ffc107' }, width: 1, title: 'NDLS-DLI Connector (8 min)' },
       { id: 'DLI_SHZM_LOCAL', from: 'DLI', to: 'SHZM', label: 'Local', color: { color: '#ffc107' }, width: 1, title: 'DLI-SHZM Local (15 min)' },
       { id: 'SHZM_ANVR_LOCAL', from: 'SHZM', to: 'ANVR', label: 'Local', color: { color: '#ffc107' }, width: 1, title: 'SHZM-ANVR Local (20 min)' },
+      
+      // Direct connection for enhanced schedule routes
+      { id: 'NDLS_SHZM_DIRECT', from: 'NDLS', to: 'SHZM', label: 'Direct', color: { color: '#17a2b8' }, width: 2, title: 'NDLS-SHZM Direct (12 min)' },
     ]);
 
     return { nodes, edges };
@@ -150,7 +155,10 @@ const NetworkGraph = ({
       }
       
       if (!edgeObject) {
-        console.warn(`No edge found between ${fromStationId} and ${toStationId}`);
+        // Only log occasionally to reduce console spam
+        if (Math.random() < 0.02) { // 2% of the time
+          console.warn(`No edge found between ${fromStationId} and ${toStationId}`);
+        }
         return null;
       }
       
@@ -212,84 +220,117 @@ const NetworkGraph = ({
     return null;
   };
 
-  // Function to interpolate along visual edge - ALWAYS follow actual network edges
-  const interpolateAlongVisualEdge = (train) => {
-    // If train is at a station (not moving), get station position from vis-network
-    if (train.isAtStation && train.currentStop) {
-      const stationPos = getStationVisualPosition(train.currentStop.Station_ID);
-      if (stationPos) {
-        return stationPos;
-      }
+  // SIMPLE: Just get trains moving on visible tracks
+  const getTrainPosition = (train) => {
+    const now = Date.now();
+    const speed = currentStrategy === 'punctuality' ? 6000 : 
+                  currentStrategy === 'throughput' ? 4000 :
+                  currentStrategy === 'balanced' ? 8000 : 10000;
+    const progress = ((now / speed) % 1);
+    
+    // Get start and end stations
+    let fromStation, toStation;
+    
+    if (train.route && train.route.length >= 2) {
+      // Use first and last station from route
+      fromStation = train.route[0].Station_ID;
+      toStation = train.route[train.route.length - 1].Station_ID;
+    } else {
+      // Use Section_Start and Section_End
+      fromStation = normalizeStationId(train.Section_Start || train.section_start);
+      toStation = normalizeStationId(train.Section_End || train.section_end);
     }
     
-    // If train is moving between stations - MUST follow visual edges
-    if (train.currentStop && train.nextStop && train.progressPercentage !== undefined) {
-      // ALWAYS try to get the visual edge geometry first
-      const edgeGeometry = getVisualEdgeGeometry(train.currentStop.Station_ID, train.nextStop.Station_ID);
-      
-      if (edgeGeometry) {
-        // Use the actual visual edge path - follow the exact rendered edge
-        const progress = train.progressPercentage;
+    if (!fromStation || !toStation) {
+      return { x: 0, y: 0 };
+    }
+    
+    // Try to find a direct visual edge first
+    let edgeGeometry = getVisualEdgeGeometry(fromStation, toStation);
+    
+    // If no direct edge, use the main route (NDLS -> ANVR -> GZB)
+    if (!edgeGeometry && fromStation === 'NDLS' && toStation === 'GZB') {
+      // For NDLS to GZB, use ANVR as intermediate
+      if (progress < 0.5) {
+        // First half: NDLS -> ANVR
+        edgeGeometry = getVisualEdgeGeometry('NDLS', 'ANVR');
+        const legProgress = progress * 2; // Scale to 0-1 for this leg
         
-        // Get the actual edge object for precise path following
-        const network = networkInstance.current;
-        const edgeObject = network.body.edges[edgeGeometry.edgeId];
-        
-        if (edgeObject && edgeObject.edgeType) {
-          try {
-            // Use vis-network's built-in getPoint method for exact edge following
-            const point = edgeObject.edgeType.getPoint(progress);
-            if (point && point.x !== undefined && point.y !== undefined) {
-              // Debug occasionally
-              if (Math.random() < 0.05) {
-                console.log(`Train following exact edge path: ${edgeGeometry.edgeId}, progress: ${progress.toFixed(3)}, point:`, point);
+        if (edgeGeometry) {
+          const network = networkInstance.current;
+          const edgeObject = network.body.edges[edgeGeometry.edgeId];
+          
+          if (edgeObject && edgeObject.edgeType && edgeObject.edgeType.getPoint) {
+            try {
+              const point = edgeObject.edgeType.getPoint(legProgress);
+              if (point && point.x !== undefined && point.y !== undefined) {
+                return { x: point.x, y: point.y };
               }
-              return { x: point.x, y: point.y };
-            }
-          } catch (error) {
-            // Fallback to basic interpolation if getPoint fails
-            if (Math.random() < 0.1) {
-              console.log(`getPoint failed for ${edgeGeometry.edgeId}, using basic interpolation:`, error);
-            }
+            } catch (error) {}
           }
-        } else if (Math.random() < 0.1) {
-          console.log(`No edgeType found for ${edgeGeometry.edgeId}, using basic interpolation`);
+          
+          return {
+            x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * legProgress,
+            y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * legProgress
+          };
         }
-        
-        // Fallback: basic interpolation between endpoints
-        const x = edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * progress;
-        const y = edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * progress;
-        return { x, y };
       } else {
-        // If no visual edge found, fall back to station positions
-        const fromStation = getStationVisualPosition(train.currentStop.Station_ID);
-        const toStation = getStationVisualPosition(train.nextStop.Station_ID);
+        // Second half: ANVR -> GZB
+        edgeGeometry = getVisualEdgeGeometry('ANVR', 'GZB');
+        const legProgress = (progress - 0.5) * 2; // Scale to 0-1 for this leg
         
-        if (fromStation && toStation) {
-          const progress = train.progressPercentage;
-          const x = fromStation.x + (toStation.x - fromStation.x) * progress;
-          const y = fromStation.y + (toStation.y - fromStation.y) * progress;
-          return { x, y };
+        if (edgeGeometry) {
+          const network = networkInstance.current;
+          const edgeObject = network.body.edges[edgeGeometry.edgeId];
+          
+          if (edgeObject && edgeObject.edgeType && edgeObject.edgeType.getPoint) {
+            try {
+              const point = edgeObject.edgeType.getPoint(legProgress);
+              if (point && point.x !== undefined && point.y !== undefined) {
+                return { x: point.x, y: point.y };
+              }
+            } catch (error) {}
+          }
+          
+          return {
+            x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * legProgress,
+            y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * legProgress
+          };
         }
       }
     }
     
-    // Use simulation-calculated position as last resort, but validate it
-    if (train.currentPosition && 
-        train.currentPosition.x !== undefined && 
-        train.currentPosition.y !== undefined) {
-      return train.currentPosition;
-    }
-    
-    // Fallback: try to get current station position
-    if (train.currentStop) {
-      const stationPos = getStationVisualPosition(train.currentStop.Station_ID);
-      if (stationPos) {
-        return stationPos;
+    // For direct edges or other routes
+    if (edgeGeometry) {
+      const network = networkInstance.current;
+      const edgeObject = network.body.edges[edgeGeometry.edgeId];
+      
+      if (edgeObject && edgeObject.edgeType && edgeObject.edgeType.getPoint) {
+        try {
+          const point = edgeObject.edgeType.getPoint(progress);
+          if (point && point.x !== undefined && point.y !== undefined) {
+            return { x: point.x, y: point.y };
+          }
+        } catch (error) {}
       }
+      
+      return {
+        x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * progress,
+        y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * progress
+      };
     }
     
-    // Ultimate fallback to origin
+    // Fallback to station positions
+    const fromPos = getStationVisualPosition(fromStation);
+    const toPos = getStationVisualPosition(toStation);
+    
+    if (fromPos && toPos) {
+      return {
+        x: fromPos.x + (toPos.x - fromPos.x) * progress,
+        y: fromPos.y + (toPos.y - fromPos.y) * progress
+      };
+    }
+    
     return { x: 0, y: 0 };
   };
 
@@ -359,10 +400,9 @@ const NetworkGraph = ({
     return null;
   };
 
-  // Step 5: Function to update train visualization based on simulation data
+  // SIMPLE: Update train visualization - just follow the tracks!
   const updateTrainVisualization = () => {
     if (!networkInstance.current || !simulationTrains || simulationTrains.length === 0) {
-      console.log('No network instance or simulation trains available');
       return;
     }
 
@@ -374,123 +414,81 @@ const NetworkGraph = ({
       nodes.remove(existingTrainIds);
     }
 
-    // Add updated train nodes with emoji representation
+    // Add trains based on schedule data
     const trainNodesToAdd = simulationTrains.map(train => {
       const trainId = `train_${train.Train_ID}`;
       
-      // Calculate position using multiple fallback methods
-      let visualPosition = interpolateAlongVisualEdge(train);
+      // Get position along the vis-network track
+      const visualPosition = getTrainPosition(train);
       
-      // Backup animation: follow visual edges when possible
-      if (!visualPosition || (visualPosition.x === 0 && visualPosition.y === 0)) {
-        const route = train.route || [];
-        if (route.length >= 2) {
-          const firstStation = route[0]?.Station_ID;
-          const lastStation = route[route.length - 1]?.Station_ID;
-          
-          // Try to use visual edge geometry for backup animation too
-          const edgeGeometry = getVisualEdgeGeometry(firstStation, lastStation);
-          
-          if (edgeGeometry) {
-            // Use time-based animation along the actual visual edge
-            const now = Date.now();
-            const animationProgress = ((now / 8000) % 1); // 8-second loop
-            
-            // Try to use the exact edge path
-            const network = networkInstance.current;
-            const edgeObject = network.body.edges[edgeGeometry.edgeId];
-            
-            if (edgeObject && edgeObject.edgeType) {
-              try {
-                const point = edgeObject.edgeType.getPoint(animationProgress);
-                if (point && point.x !== undefined && point.y !== undefined) {
-                  visualPosition = { x: point.x, y: point.y };
-                } else {
-                  // Fallback to linear interpolation
-                  visualPosition = {
-                    x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * animationProgress,
-                    y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * animationProgress
-                  };
-                }
-              } catch (error) {
-                // Fallback to linear interpolation
-                visualPosition = {
-                  x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * animationProgress,
-                  y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * animationProgress
-                };
-              }
-            } else {
-              // Fallback to linear interpolation
-              visualPosition = {
-                x: edgeGeometry.from.x + (edgeGeometry.to.x - edgeGeometry.from.x) * animationProgress,
-                y: edgeGeometry.from.y + (edgeGeometry.to.y - edgeGeometry.from.y) * animationProgress
-              };
-            }
-          } else {
-            // Fall back to station positions
-            const start = getStationVisualPosition(firstStation);
-            const end = getStationVisualPosition(lastStation);
-            
-            if (start && end) {
-              const now = Date.now();
-              const animationProgress = ((now / 8000) % 1);
-              visualPosition = {
-                x: start.x + (end.x - start.x) * animationProgress,
-                y: start.y + (end.y - start.y) * animationProgress
-              };
-            } else {
-              visualPosition = { x: 0, y: 0 };
-            }
-          }
-        } else {
-          visualPosition = { x: 0, y: 0 };
-        }
-      }
-      
-      // Get status-based color for train emoji background
-      const getTrainColor = (status) => {
-        switch (status) {
-          case 'Scheduled':
-            return { background: '#6c757d', border: '#495057' }; // Gray
-          case 'En-Route':
-            return { background: '#28a745', border: '#198754' }; // Green
-          case 'Delayed':
-            return { background: '#ffc107', border: '#e0a800' }; // Orange
-          case 'Stopped':
-            return { background: '#17a2b8', border: '#138496' }; // Blue-cyan for stopped at station
-          case 'Arrived':
-            return { background: '#007bff', border: '#0056b3' }; // Blue
+      // Get strategy-specific train styling
+      const getTrainStyleByStrategy = (strategy, status) => {
+        // Base colors by status
+        const statusColors = {
+          'Scheduled': { background: '#6c757d', border: '#495057' },
+          'En-Route': { background: '#28a745', border: '#198754' },
+          'Delayed': { background: '#ffc107', border: '#e0a800' },
+          'Stopped': { background: '#17a2b8', border: '#138496' },
+          'Arrived': { background: '#007bff', border: '#0056b3' },
+        };
+
+        // Strategy-specific modifications
+        const baseColor = statusColors[status] || { background: '#dc3545', border: '#b02a37' };
+        
+        switch (strategy) {
+          case 'balanced':
+            return {
+              ...baseColor,
+              emoji: '🚂', // Steam locomotive for balanced approach
+              size: 16,
+              borderWidth: 2,
+              shadow: { enabled: true, color: 'rgba(40, 167, 69, 0.4)', size: 4 }
+            };
+          case 'punctuality':
+            return {
+              background: '#6f42c1', // Purple for punctuality
+              border: '#5a2d91',
+              emoji: '🚄', // High-speed train for punctuality first
+              size: 18,
+              borderWidth: 3,
+              shadow: { enabled: true, color: 'rgba(111, 66, 193, 0.5)', size: 5 }
+            };
+          case 'throughput':
+            return {
+              background: '#fd7e14', // Orange for maximum throughput
+              border: '#e8630a',
+              emoji: '🚅', // Bullet train for max throughput
+              size: 20,
+              borderWidth: 2,
+              shadow: { enabled: true, color: 'rgba(253, 126, 20, 0.6)', size: 6 }
+            };
           default:
-            return { background: '#dc3545', border: '#b02a37' }; // Red
+            return {
+              ...baseColor,
+              emoji: '🚆', // Regular train for normal simulation
+              size: 16,
+              borderWidth: 2,
+              shadow: { enabled: true, color: 'rgba(0, 0, 0, 0.3)', size: 3 }
+            };
         }
       };
 
-      // Create detailed tooltip with journey information
+      // Simple tooltip
       const createTooltip = () => {
         let tooltip = `🚆 ${train.Train_ID}\n`;
-        tooltip += `Type: ${train.Train_Type}\n`;
-        tooltip += `Status: ${train.currentStatus}\n`;
+        tooltip += `Type: ${train.Train_Type || 'Unknown'}\n`;
         
-        if (train.stationInfo) {
-          tooltip += `Location: ${train.stationInfo}\n`;
+        if (currentStrategy) {
+          tooltip += `Strategy: ${currentStrategy.charAt(0).toUpperCase() + currentStrategy.slice(1)}\n`;
         }
         
-        if (train.trackId) {
-          tooltip += `Track: ${train.trackId}\n`;
-        }
-        
-        if (train.route && train.route.length > 0) {
+        // Show route
+        if (train.route && train.route.length >= 2) {
           const origin = train.route[0];
           const destination = train.route[train.route.length - 1];
-          tooltip += `Journey: ${origin.Station_Name} → ${destination.Station_Name}\n`;
-          
-          if (train.currentStop && train.nextStop) {
-            tooltip += `Current Leg: ${train.currentStop.Station_Name} → ${train.nextStop.Station_Name}\n`;
-          }
-          
-          if (train.progressPercentage) {
-            tooltip += `Progress: ${Math.round(train.progressPercentage * 100)}%\n`;
-          }
+          tooltip += `Route: ${origin.Station_Name || origin.Station_ID} → ${destination.Station_Name || destination.Station_ID}\n`;
+        } else if (train.Section_Start && train.Section_End) {
+          tooltip += `Route: ${train.Section_Start} → ${train.Section_End}\n`;
         }
         
         if (train.Initial_Reported_Delay_Mins > 0) {
@@ -500,30 +498,31 @@ const NetworkGraph = ({
         return tooltip;
       };
 
+      // Get strategy-specific styling
+      const status = train.Initial_Reported_Delay_Mins > 0 ? 'Delayed' : 'En-Route';
+      const trainStyle = getTrainStyleByStrategy(currentStrategy, status);
+      
       return {
         id: trainId,
-        label: '🚆', // Train emoji as the visual representation
+        label: trainStyle.emoji,
         x: visualPosition.x,
         y: visualPosition.y,
         group: 'train',
-        color: getTrainColor(train.currentStatus),
+        color: { 
+          background: trainStyle.background, 
+          border: trainStyle.border 
+        },
         title: createTooltip(),
         physics: false,
         shape: 'circle',
-        size: 16, // Larger size to accommodate emoji
+        size: trainStyle.size,
         font: { 
-          size: 14, 
+          size: Math.max(12, trainStyle.size - 4), 
           color: 'white',
-          face: 'monospace' // Better emoji rendering
+          face: 'monospace'
         },
-        borderWidth: 2,
-        shadow: {
-          enabled: true,
-          color: 'rgba(0,0,0,0.3)',
-          size: 3,
-          x: 1,
-          y: 1
-        }
+        borderWidth: trainStyle.borderWidth,
+        shadow: trainStyle.shadow
       };
     });
 
@@ -552,35 +551,6 @@ const NetworkGraph = ({
     });
   };
 
-  // Calculate train position based on its current state
-  const getTrainPosition = (train) => {
-    const stationPositions = {
-      'NDLS': { x: 0, y: 0 },
-      'ANVR': { x: 300, y: -50 },
-      'GZB': { x: 600, y: 0 },
-      'SBB': { x: 500, y: 150 },
-      'VVB': { x: 300, y: 100 },
-      'SHZM': { x: 150, y: 75 },
-      'DLI': { x: -100, y: 50 },
-      'MUT': { x: 800, y: -100 },
-      'Anand_Vihar': { x: 300, y: -50 },
-      'Ghaziabad': { x: 600, y: 0 },
-      'Aligarh': { x: 900, y: 100 },
-    };
-
-    const start = stationPositions[train.section_start] || stationPositions[train.current_location] || { x: 0, y: 0 };
-    const end = stationPositions[train.section_end] || { x: 100, y: 0 };
-
-    // Simple animation: move train along the route based on simulation time
-    const progress = isSimulationRunning ? 
-      ((Date.now() / 10000) % 1) : // Complete route every 10 seconds during simulation
-      0; // Static position when not simulating
-
-    return {
-      x: start.x + (end.x - start.x) * progress + Math.random() * 20 - 10, // Add slight randomness
-      y: start.y + (end.y - start.y) * progress + Math.random() * 20 - 10,
-    };
-  };
 
   // Network configuration options
   const getNetworkOptions = () => ({

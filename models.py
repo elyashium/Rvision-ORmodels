@@ -235,6 +235,7 @@ class RailwayNetwork:
         # Initialize network graph and route optimizer
         self.network_graph = NetworkGraph("network_graph.json")
         self.route_optimizer = RouteOptimizer(self.network_graph)
+        print(f"🗺️ Route optimizer initialized with {self.route_optimizer.pathfinding_strategy} strategy")
         
         # Initialize all trains from the schedule data
         self.trains: Dict[str, Train] = {

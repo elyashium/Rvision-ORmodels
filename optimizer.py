@@ -359,7 +359,7 @@ class Optimizer:
                 "solution": solution,
                 "score": score,
                 "train_priority": train.priority,
-                "train_name": train.name
+                "train_name": train.get_name()
             }
             
             scored_solutions.append(scored_solution)
@@ -561,18 +561,21 @@ class MultiStrategyOptimizer:
         self.strategies = {
             "balanced": {
                 "name": "Balanced Approach",
-                "description": "A balanced approach to minimize overall network disruption while considering all train types equally.",
-                "weights": self._get_balanced_weights()
+                "description": "Uses Dijkstra's algorithm for optimal routes, balancing all train types equally.",
+                "weights": self._get_balanced_weights(),
+                "pathfinding_algorithm": "dijkstra"
             },
             "punctuality": {
                 "name": "Punctuality First",
-                "description": "Prioritizes on-time performance for passenger trains, especially high-priority services like Express trains.",
-                "weights": self._get_punctuality_weights()
+                "description": "Uses A* search for fast optimal routes, prioritizing on-time performance for passenger trains.",
+                "weights": self._get_punctuality_weights(),
+                "pathfinding_algorithm": "astar"
             },
             "throughput": {
                 "name": "Maximum Throughput",
-                "description": "Focuses on network efficiency, keeping the maximum number of trains moving and prioritizing goods flow.",
-                "weights": self._get_throughput_weights()
+                "description": "Uses Greedy Best-First for fast decisions, maximizing network flow and capacity.",
+                "weights": self._get_throughput_weights(),
+                "pathfinding_algorithm": "greedy"
             }
         }
     
@@ -724,6 +727,12 @@ class MultiStrategyOptimizer:
     
     def _run_strategy(self, network: RailwayNetwork, strategy_key: str, strategy_config: Dict) -> Dict[str, Any]:
         """Run optimization with a specific strategy."""
+        
+        # Configure pathfinding algorithm for this strategy
+        pathfinding_algorithm = strategy_config.get("pathfinding_algorithm", "dijkstra")
+        if hasattr(network, 'route_optimizer') and network.route_optimizer:
+            network.route_optimizer.set_pathfinding_strategy(pathfinding_algorithm)
+            print(f"🗺️ Strategy '{strategy_key}' using {pathfinding_algorithm} pathfinding")
         
         # Step 1: Detect conflicts
         conflicts = self._detect_conflicts(network, projection_horizon_mins=60)
@@ -968,7 +977,7 @@ class MultiStrategyOptimizer:
                 "solution": solution,
                 "score": score,
                 "train_priority": train.priority,
-                "train_name": train.name,
+                "train_name": train.get_name(),
                 "train_type": train.train_type
             }
             

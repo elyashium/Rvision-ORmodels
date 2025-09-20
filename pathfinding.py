@@ -114,17 +114,27 @@ class NetworkGraph:
 
 class RouteOptimizer:
     """
-    Implements pathfinding algorithms for railway route optimization.
+    Implements multiple pathfinding algorithms for railway route optimization.
     """
     
     def __init__(self, network_graph: NetworkGraph):
         self.network = network_graph
+        self.pathfinding_strategy = "dijkstra"  # Default strategy
     
+    def set_pathfinding_strategy(self, strategy: str):
+        """Set the pathfinding strategy: 'dijkstra', 'greedy', or 'astar'"""
+        valid_strategies = ['dijkstra', 'greedy', 'astar']
+        if strategy in valid_strategies:
+            self.pathfinding_strategy = strategy
+            print(f"🗺️ PATHFINDING: Strategy set to {strategy}")
+        else:
+            print(f"⚠️ PATHFINDING: Invalid strategy {strategy}, keeping {self.pathfinding_strategy}")
+
     def find_best_route(self, origin: str, destination: str, 
                        train_type: str = "Express", 
                        optimization_criteria: str = "time") -> Optional[Route]:
         """
-        Find the best route between two stations using Dijkstra's algorithm.
+        Find the best route between two stations using the selected pathfinding algorithm.
         
         Args:
             origin: Starting station code
@@ -139,11 +149,16 @@ class RouteOptimizer:
         if origin == destination:
             return None  # No route needed
         
-        # Use Dijkstra's algorithm to find optimal path
-        route_segments = self._dijkstra_shortest_path(origin, destination, optimization_criteria, train_type)
+        # Choose pathfinding algorithm based on strategy
+        if self.pathfinding_strategy == "greedy":
+            route_segments = self._greedy_best_first(origin, destination, optimization_criteria, train_type)
+        elif self.pathfinding_strategy == "astar":
+            route_segments = self._astar_search(origin, destination, optimization_criteria, train_type)
+        else:  # Default to Dijkstra
+            route_segments = self._dijkstra_shortest_path(origin, destination, optimization_criteria, train_type)
         
         if not route_segments:
-            print(f"❌ NO ROUTE FOUND: {origin} -> {destination}")
+            print(f"❌ NO ROUTE FOUND: {origin} -> {destination} using {self.pathfinding_strategy}")
             return None
         
         # Build Route object
@@ -154,7 +169,7 @@ class RouteOptimizer:
         stations = [route_segments[0].from_station]
         stations.extend([seg.to_station for seg in route_segments])
         
-        route_type = "alternative" if len(route_segments) > 2 else "primary"
+        route_type = f"{self.pathfinding_strategy}_route"
         
         return Route(
             segments=route_segments,
@@ -216,6 +231,131 @@ class RouteOptimizer:
                     heapq.heappush(pq, (new_cost, entry_count, neighbor, new_path))
         
         return []  # No path found
+    
+    def _greedy_best_first(self, origin: str, destination: str, 
+                          criteria: str, train_type: str) -> List[RouteSegment]:
+        """
+        Greedy Best-First Search - always chooses the track that seems closest to destination.
+        This is faster but may not find the optimal route.
+        """
+        # Priority queue: (heuristic_cost, entry_count, current_station, path_segments)
+        entry_count = 0
+        pq = [(0, entry_count, origin, [])]
+        visited = set()
+        
+        while pq:
+            _, _, current_station, path_segments = heapq.heappop(pq)
+            
+            if current_station in visited:
+                continue
+            
+            visited.add(current_station)
+            
+            # Reached destination
+            if current_station == destination:
+                return path_segments
+            
+            # Explore neighbors - Greedy: only considers heuristic (distance to goal)
+            for neighbor, track_id, track_data in self.network.adjacency_list.get(current_station, []):
+                if track_data.get("status") != "operational":
+                    continue
+                
+                if neighbor not in visited:
+                    # Greedy heuristic: prefer tracks that lead toward destination
+                    heuristic_cost = self._calculate_heuristic_distance(neighbor, destination)
+                    
+                    # Create route segment
+                    segment = RouteSegment(
+                        track_id=track_id,
+                        from_station=current_station,
+                        to_station=neighbor,
+                        distance_km=track_data.get("distance_km", 0),
+                        travel_time_minutes=track_data.get("travel_time_minutes", 30),
+                        track_type=track_data.get("track_type", "single_line"),
+                        capacity=track_data.get("capacity_trains_per_hour", 4),
+                        priority=track_data.get("priority", "medium"),
+                        status=track_data.get("status", "operational")
+                    )
+                    
+                    new_path = path_segments + [segment]
+                    entry_count += 1
+                    heapq.heappush(pq, (heuristic_cost, entry_count, neighbor, new_path))
+        
+        return []  # No path found
+    
+    def _astar_search(self, origin: str, destination: str, 
+                     criteria: str, train_type: str) -> List[RouteSegment]:
+        """
+        A* Search - combines actual cost with heuristic estimate.
+        Finds optimal path while being more efficient than Dijkstra.
+        """
+        # Priority queue: (f_cost, entry_count, current_station, path_segments, g_cost)
+        entry_count = 0
+        h_start = self._calculate_heuristic_distance(origin, destination)
+        pq = [(h_start, entry_count, origin, [], 0)]
+        visited = set()
+        
+        while pq:
+            f_cost, _, current_station, path_segments, g_cost = heapq.heappop(pq)
+            
+            if current_station in visited:
+                continue
+            
+            visited.add(current_station)
+            
+            # Reached destination
+            if current_station == destination:
+                return path_segments
+            
+            # Explore neighbors
+            for neighbor, track_id, track_data in self.network.adjacency_list.get(current_station, []):
+                if track_data.get("status") != "operational":
+                    continue
+                
+                if neighbor not in visited:
+                    # Calculate costs for A*
+                    edge_cost = self._calculate_edge_cost(track_data, criteria, train_type)
+                    new_g_cost = g_cost + edge_cost  # Actual cost from start
+                    h_cost = self._calculate_heuristic_distance(neighbor, destination)  # Heuristic to goal
+                    f_cost = new_g_cost + h_cost  # Total estimated cost
+                    
+                    # Create route segment
+                    segment = RouteSegment(
+                        track_id=track_id,
+                        from_station=current_station,
+                        to_station=neighbor,
+                        distance_km=track_data.get("distance_km", 0),
+                        travel_time_minutes=track_data.get("travel_time_minutes", 30),
+                        track_type=track_data.get("track_type", "single_line"),
+                        capacity=track_data.get("capacity_trains_per_hour", 4),
+                        priority=track_data.get("priority", "medium"),
+                        status=track_data.get("status", "operational")
+                    )
+                    
+                    new_path = path_segments + [segment]
+                    entry_count += 1
+                    heapq.heappush(pq, (f_cost, entry_count, neighbor, new_path, new_g_cost))
+        
+        return []  # No path found
+    
+    def _calculate_heuristic_distance(self, station_a: str, station_b: str) -> float:
+        """
+        Calculate heuristic distance between two stations for A* and Greedy algorithms.
+        Uses straight-line distance based on coordinates.
+        """
+        if station_a not in self.network.stations or station_b not in self.network.stations:
+            return float('inf')
+        
+        coord_a = self.network.stations[station_a].get("coordinates", {"lat": 0, "lon": 0})
+        coord_b = self.network.stations[station_b].get("coordinates", {"lat": 0, "lon": 0})
+        
+        # Simple Euclidean distance (scaled for railway network)
+        lat_diff = coord_a["lat"] - coord_b["lat"]
+        lon_diff = coord_a["lon"] - coord_b["lon"]
+        distance = (lat_diff**2 + lon_diff**2)**0.5
+        
+        # Convert to approximate travel time (rough heuristic)
+        return distance * 100  # Scale factor to match travel times
     
     def _calculate_edge_cost(self, track_data: Dict, criteria: str, train_type: str) -> float:
         """Calculate the cost of traversing a track segment."""

@@ -207,9 +207,42 @@
       "status": "operational",
       "priority": "medium"
     },
+    "SBB_NDLS_ALT": {
+      "from": "SBB",
+      "to": "NDLS",
+      "distance_km": 22.1,
+      "max_speed_kmh": 80,
+      "track_type": "single_line",
+      "capacity_trains_per_hour": 3,
+      "travel_time_minutes": 35,
+      "status": "operational",
+      "priority": "medium"
+    },
+    "GZB_SBB_ALT": {
+      "from": "GZB",
+      "to": "SBB",
+      "distance_km": 12.3,
+      "max_speed_kmh": 80,
+      "track_type": "single_line",
+      "capacity_trains_per_hour": 3,
+      "travel_time_minutes": 20,
+      "status": "operational",
+      "priority": "medium"
+    },
     "GZB_MUT_EXTENSION": {
       "from": "GZB",
       "to": "MUT",
+      "distance_km": 45.2,
+      "max_speed_kmh": 120,
+      "track_type": "double_line",
+      "capacity_trains_per_hour": 4,
+      "travel_time_minutes": 60,
+      "status": "operational",
+      "priority": "high"
+    },
+    "MUT_GZB_EXTENSION": {
+      "from": "MUT",
+      "to": "GZB",
       "distance_km": 45.2,
       "max_speed_kmh": 120,
       "track_type": "double_line",
@@ -241,10 +274,30 @@
         ["NDLS_SHZM_DIRECT", "SHZM_ANVR_LOCAL", "ANVR_GZB_MAIN"]
       ]
     },
+    "GZB_to_NDLS": {
+      "primary": ["GZB_ANVR_MAIN", "ANVR_NDLS_MAIN"],
+      "alternatives": [
+        ["GZB_SBB_ALT", "SBB_NDLS_ALT"],
+        ["GZB_ANVR_MAIN", "VVB_ANVR_BYPASS", "NDLS_VVB_BYPASS"],
+        ["GZB_ANVR_MAIN", "SHZM_ANVR_LOCAL", "SHZM_NDLS_DIRECT"]
+      ]
+    },
     "NDLS_to_SHZM": {
       "primary": ["NDLS_SHZM_DIRECT"],
       "alternatives": [
         ["NDLS_DLI_CONNECTOR", "DLI_SHZM_LOCAL"]
+      ]
+    },
+    "MUT_to_NDLS": {
+      "primary": ["MUT_GZB_EXTENSION", "GZB_ANVR_MAIN", "ANVR_NDLS_MAIN"],
+      "alternatives": [
+        ["MUT_GZB_EXTENSION", "GZB_SBB_ALT", "SBB_NDLS_ALT"]
+      ]
+    },
+    "NDLS_to_MUT": {
+      "primary": ["NDLS_ANVR_MAIN", "ANVR_GZB_MAIN", "GZB_MUT_EXTENSION"],
+      "alternatives": [
+        ["NDLS_SBB_ALT", "SBB_GZB_ALT", "GZB_MUT_EXTENSION"]
       ]
     }
   }

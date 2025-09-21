@@ -598,8 +598,117 @@ class RailwayNetwork:
                     if segment.track_id == track_id:
                         affected_trains.append(train)
                         break
+            
+            # Also check if train's visual_route_path uses track stations
+            # This helps with trains that don't have detailed route segments
+            if hasattr(train, 'visual_route_path') and train.visual_route_path:
+                track_data = self.network_graph.tracks.get(track_id, {})
+                from_station = track_data.get('from')
+                to_station = track_data.get('to')
+                
+                if from_station and to_station:
+                    # Check if this track's stations are in the train's path
+                    path = train.visual_route_path
+                    for i in range(len(path) - 1):
+                        if ((path[i] == from_station and path[i + 1] == to_station) or
+                            (path[i] == to_station and path[i + 1] == from_station)):
+                            if train not in affected_trains:
+                                affected_trains.append(train)
+                            break
         
         return affected_trains
+
+    def recalculate_routes_for_trains(self, train_ids: List[str]) -> Dict[str, Any]:
+        """
+        Recalculate routes for specific trains only. 
+        This is used for live rerouting when tracks fail.
+        
+        Returns:
+            Dict with updated train routes and rerouting information
+        """
+        updated_trains = {}
+        rerouting_info = []
+        
+        for train_id in train_ids:
+            train = self.get_train(train_id)
+            if not train:
+                continue
+                
+            print(f"🔄 LIVE REROUTING: Recalculating route for train {train_id}")
+            
+            # Store original route for comparison
+            original_route = train.current_route
+            original_path = getattr(train, 'visual_route_path', [])
+            
+            # Find new primary route
+            new_primary_route = self.route_optimizer.find_best_route(
+                train.section_start, 
+                train.section_end, 
+                train.train_type, 
+                "time"
+            )
+            
+            # Find new alternative routes
+            new_alternative_routes = self.route_optimizer.find_alternative_routes(
+                train.section_start, 
+                train.section_end, 
+                train.train_type, 
+                max_alternatives=2
+            )
+            
+            # Remove new primary route from alternatives if it appears there
+            new_alternative_routes = [r for r in new_alternative_routes if r != new_primary_route]
+            
+            if new_primary_route:
+                # Update train's routes
+                train.set_routes(new_primary_route, new_alternative_routes)
+                
+                # Calculate rerouting impact
+                time_impact = 0
+                if original_route:
+                    time_impact = new_primary_route.total_time_minutes - original_route.total_time_minutes
+                
+                reroute_info = {
+                    "train_id": train_id,
+                    "train_name": train.get_name(),
+                    "success": True,
+                    "original_path": original_path,
+                    "new_path": train.visual_route_path,
+                    "time_impact_minutes": max(0, time_impact),
+                    "new_route_type": new_primary_route.route_type,
+                    "alternatives_available": len(new_alternative_routes)
+                }
+                
+                # Apply time impact as delay if route is longer
+                if time_impact > 0:
+                    train.apply_delay(time_impact, f"Rerouted due to track failure (+{time_impact}min)")
+                
+                updated_trains[train_id] = train.get_current_status_info()
+                
+                print(f"   ✅ New route: {' → '.join(train.visual_route_path)}")
+                print(f"   ⏱️  Impact: +{time_impact} minutes")
+                
+            else:
+                reroute_info = {
+                    "train_id": train_id,
+                    "train_name": train.get_name(),
+                    "success": False,
+                    "error": "No alternative route available",
+                    "original_path": original_path,
+                    "new_path": [],
+                    "time_impact_minutes": 0
+                }
+                
+                print(f"   ❌ No alternative route found for {train_id}")
+            
+            rerouting_info.append(reroute_info)
+        
+        return {
+            "updated_trains": updated_trains,
+            "rerouting_info": rerouting_info,
+            "total_affected": len(train_ids),
+            "successfully_rerouted": len([r for r in rerouting_info if r["success"]])
+        }
 
     def get_state_snapshot(self) -> Dict:
         """

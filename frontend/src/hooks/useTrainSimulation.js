@@ -8,6 +8,8 @@ export const useTrainSimulation = () => {
   const [simulationTime, setSimulationTime] = useState(null);
   const [simulationSpeed, setSimulationSpeed] = useState(1000); // 1000x real-time speed
   const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [pauseReason, setPauseReason] = useState(null);
   const [rawScheduleData, setRawScheduleData] = useState([]);
 
   // Helper function to find the earliest departure time (Enhanced for new format)
@@ -639,9 +641,9 @@ export const useTrainSimulation = () => {
   }, [preprocessTrainData]);
 
   // Step 4: Refactored simulation loop for stability and correctness
-  // Effect 1: Advances the simulation time when running
+  // Effect 1: Advances the simulation time when running (now with pause support)
   useEffect(() => {
-    if (!isRunning) return;
+    if (!isRunning || isPaused) return; // Don't advance time when paused
 
     const intervalId = setInterval(() => {
       setSimulationTime(prevTime => {
@@ -652,11 +654,11 @@ export const useTrainSimulation = () => {
     }, 50); // Tick every 50ms for smooth animation
 
     return () => clearInterval(intervalId);
-  }, [isRunning, simulationSpeed]);
+  }, [isRunning, isPaused, simulationSpeed]);
 
-  // Effect 2: Updates train positions whenever the simulation time changes
+  // Effect 2: Updates train positions whenever the simulation time changes (respect pause state)
   useEffect(() => {
-    if (!isRunning || !simulationTime || !networkData) return;
+    if (!isRunning || isPaused || !simulationTime || !networkData) return;
 
     setTrains(prevTrains =>
       prevTrains.map(train => {
@@ -688,12 +690,131 @@ export const useTrainSimulation = () => {
   const resetSimulation = useCallback(() => {
     if (rawScheduleData.length > 0 && networkData) {
       setIsRunning(false);
+      setIsPaused(false);
+      setPauseReason(null);
       const processedTrains = preprocessTrainData(rawScheduleData, networkData);
       setTrains(processedTrains);
       const earliestTime = findEarliestDepartureTime(rawScheduleData);
       setSimulationTime(earliestTime);
     }
   }, [rawScheduleData, networkData, preprocessTrainData]);
+
+  // Live rerouting functionality
+  const pauseSimulation = useCallback((reason = 'User requested') => {
+    setIsPaused(true);
+    setPauseReason(reason);
+    console.log(`⏸️ Simulation paused: ${reason}`);
+  }, []);
+
+  const resumeSimulation = useCallback(() => {
+    setIsPaused(false);
+    setPauseReason(null);
+    console.log('▶️ Simulation resumed');
+  }, []);
+
+  const updateTrainRoutes = useCallback((routeUpdates) => {
+    console.log('🔄 Updating train routes with live rerouting data:', routeUpdates);
+    
+    setTrains(prevTrains => {
+      return prevTrains.map(train => {
+        const update = routeUpdates.find(u => u.train_id === train.Train_ID);
+        if (update && update.new_path && update.new_path.length > 1) {
+          // Update the train's visual route path with the new route
+          const updatedTrain = {
+            ...train,
+            visual_route_path: update.new_path,
+            status: update.success ? 'Rerouted' : train.status,
+            rerouting_info: {
+              original_path: update.original_path,
+              new_path: update.new_path,
+              time_impact: update.time_impact_minutes,
+              success: update.success
+            }
+          };
+          
+          // If the train has a detailed route, try to update it as well
+          if (updatedTrain.route && update.new_path.length >= 2) {
+            // Create simplified route based on new path
+            const newRoute = update.new_path.map((stationId, index) => {
+              const isFirst = index === 0;
+              const isLast = index === update.new_path.length - 1;
+              
+              return {
+                Station_ID: stationId,
+                Station_Name: stationId,
+                Arrival_Time: isFirst ? null : train.route[Math.min(index, train.route.length - 1)]?.Arrival_Time,
+                Departure_Time: isLast ? null : train.route[Math.min(index, train.route.length - 1)]?.Departure_Time,
+                Platform: '1',
+                isOrigin: isFirst,
+                isDestination: isLast
+              };
+            });
+            
+            updatedTrain.route = newRoute;
+          }
+          
+          console.log(`   ✅ Updated route for train ${train.Train_ID}: ${update.new_path.join(' → ')}`);
+          return updatedTrain;
+        }
+        return train;
+      });
+    });
+  }, []);
+
+  const reportTrackFailure = useCallback(async (trackId, description = 'Track failure') => {
+    try {
+      console.log(`🚫 Reporting track failure: ${trackId}`);
+      
+      // Pause simulation immediately
+      pauseSimulation(`Track failure: ${trackId}`);
+      
+      // Call the backend API
+      const response = await fetch('/api/track-failure', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          track_id: trackId,
+          description: description,
+          live_rerouting: true
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Track failure API failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('📡 Track failure response:', data);
+
+      if (data.status === 'success' && data.rerouting_results) {
+        // Update train routes with the new paths
+        if (data.rerouting_results.rerouting_info && data.rerouting_results.rerouting_info.length > 0) {
+          updateTrainRoutes(data.rerouting_results.rerouting_info);
+        }
+        
+        // Resume simulation after a short delay
+        setTimeout(() => {
+          resumeSimulation();
+        }, 2000);
+        
+        return {
+          success: true,
+          affected_trains: data.affected_trains,
+          rerouting_summary: data.rerouting_summary
+        };
+      } else {
+        console.error('Track failure API returned error:', data);
+        resumeSimulation(); // Resume even if rerouting failed
+        return { success: false, error: data.error || 'Unknown error' };
+      }
+    } catch (error) {
+      console.error('Failed to report track failure:', error);
+      resumeSimulation(); // Resume on any error
+      return { success: false, error: error.message };
+    }
+  }, [pauseSimulation, resumeSimulation, updateTrainRoutes]);
 
   // Function to load trains from strategy simulation results  
   const loadStrategySimulation = useCallback((strategySimulationData) => {
@@ -783,6 +904,8 @@ export const useTrainSimulation = () => {
     simulationTime,
     simulationSpeed,
     isRunning,
+    isPaused,
+    pauseReason,
     
     // Actions
     loadSchedule,
@@ -791,6 +914,12 @@ export const useTrainSimulation = () => {
     stopSimulation,
     resetSimulation,
     setSimulationSpeed,
+    
+    // Live rerouting actions
+    pauseSimulation,
+    resumeSimulation,
+    reportTrackFailure,
+    updateTrainRoutes,
     
     // Utils
     calculateTrainPosition

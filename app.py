@@ -265,13 +265,14 @@ def get_all_trains():
 @app.route('/api/track-failure', methods=['POST'])
 def report_track_failure():
     """
-    Report a track failure event.
+    Enhanced track failure endpoint with live rerouting capabilities.
     
     Expected JSON payload:
     {
         "track_id": "NDLS_ANVR_MAIN",
         "description": "Signal failure on main line",
-        "event_type": "track_failure"
+        "event_type": "track_failure",
+        "live_rerouting": true  // Optional: enables live rerouting
     }
     """
     try:
@@ -287,31 +288,60 @@ def report_track_failure():
         if 'track_id' not in event_data:
             return jsonify({"error": "Missing required field: track_id"}), 400
         
-        # Set event type
-        event_data['event_type'] = 'track_failure'
+        track_id = event_data['track_id']
+        live_rerouting = event_data.get('live_rerouting', True)  # Default to true for new feature
         
-        print(f"\n🚫 TRACK FAILURE REPORTED: {event_data}")
+        print(f"\n🚫 LIVE TRACK FAILURE REPORTED: {track_id}")
+        print(f"   Live rerouting: {'Enabled' if live_rerouting else 'Disabled'}")
         
-        # Apply the track failure event
-        success = network.apply_event(event_data)
+        # Step 1: Identify affected trains BEFORE disabling the track
+        affected_trains = network._find_trains_using_track(track_id)
+        affected_train_ids = [train.id for train in affected_trains]
+        
+        print(f"   📍 Identified {len(affected_trains)} affected trains: {affected_train_ids}")
+        
+        # Step 2: Disable the track
+        success = network.network_graph.disable_track(track_id, event_data.get('description', 'Track failure'))
         
         if not success:
             return jsonify({
-                "error": f"Failed to apply track failure for {event_data.get('track_id')}"
+                "error": f"Failed to disable track {track_id}. Track may not exist."
             }), 400
         
-        # Get updated network state
+        # Step 3: Live rerouting for affected trains
+        rerouting_results = None
+        if live_rerouting and affected_train_ids:
+            print(f"   🔄 Starting live rerouting for {len(affected_train_ids)} trains...")
+            rerouting_results = network.recalculate_routes_for_trains(affected_train_ids)
+            print(f"   ✅ Rerouting completed: {rerouting_results['successfully_rerouted']}/{rerouting_results['total_affected']} trains")
+        
+        # Step 4: Get updated network state
         network_state = network.get_state_snapshot()
         
+        # Step 5: Prepare response
         response = {
             "status": "success",
-            "event_processed": event_data,
+            "event_type": "track_failure",
+            "track_id": track_id,
+            "track_status": "disabled",
+            "affected_trains": affected_train_ids,
+            "live_rerouting_enabled": live_rerouting,
+            "rerouting_results": rerouting_results,
             "network_state": network_state,
-            "message": f"Track failure applied to {event_data.get('track_id')}. Alternative routes calculated.",
+            "message": f"Track {track_id} disabled. {len(affected_trains)} trains affected.",
             "timestamp": network_state["timestamp"]
         }
         
-        print(f"✅ TRACK FAILURE PROCESSED")
+        # Add detailed rerouting information to response
+        if rerouting_results:
+            response["rerouting_summary"] = {
+                "total_trains_affected": rerouting_results["total_affected"],
+                "successfully_rerouted": rerouting_results["successfully_rerouted"],
+                "failed_reroutings": rerouting_results["total_affected"] - rerouting_results["successfully_rerouted"],
+                "rerouting_details": rerouting_results["rerouting_info"]
+            }
+        
+        print(f"✅ LIVE TRACK FAILURE PROCESSED - {track_id}")
         
         return jsonify(response)
     
@@ -432,9 +462,44 @@ def get_system_info():
             "total_tracks": len(network.network_graph.tracks) if network and network.network_graph else 0,
             "optimization_enabled": optimizer is not None,
             "pathfinding_enabled": True,
-            "rerouting_enabled": True
+            "rerouting_enabled": True,
+            "live_rerouting_enabled": True
         }
     })
+
+@app.route('/api/tracks', methods=['GET'])
+def get_available_tracks():
+    """Get list of all available tracks for track failure reporting."""
+    try:
+        if not network or not network.network_graph:
+            return jsonify({"error": "System not initialized"}), 500
+        
+        tracks = []
+        for track_id, track_data in network.network_graph.tracks.items():
+            tracks.append({
+                "track_id": track_id,
+                "from_station": track_data.get("from", "Unknown"),
+                "to_station": track_data.get("to", "Unknown"),
+                "status": track_data.get("status", "operational"),
+                "track_type": track_data.get("track_type", "unknown"),
+                "priority": track_data.get("priority", "medium"),
+                "travel_time_minutes": track_data.get("travel_time_minutes", 0),
+                "can_disable": track_data.get("status", "operational") == "operational"
+            })
+        
+        # Sort tracks by from_station, then to_station for consistent UI ordering
+        tracks.sort(key=lambda t: (t["from_station"], t["to_station"]))
+        
+        return jsonify({
+            "status": "success",
+            "tracks": tracks,
+            "total_tracks": len(tracks),
+            "operational_tracks": len([t for t in tracks if t["status"] == "operational"]),
+            "disabled_tracks": len([t for t in tracks if t["status"] == "disabled"])
+        })
+    
+    except Exception as e:
+        return jsonify({"error": f"Failed to get tracks: {str(e)}"}), 500
 
 # --- Error Handlers ---
 
@@ -461,11 +526,12 @@ if __name__ == '__main__':
     print("   GET  /                     - Health check")
     print("   GET  /api/state            - Get current network state")
     print("   POST /api/report-event     - Report train disruption event")
-    print("   POST /api/track-failure    - Report track failure event")
+    print("   POST /api/track-failure    - Report track failure event (LIVE REROUTING)")
     print("   POST /api/track-repair     - Report track repair event")
     print("   POST /api/accept-recommendation - Accept AI recommendation")
     print("   POST /api/reset            - Reset simulation")
     print("   GET  /api/trains           - Get all train information")
+    print("   GET  /api/tracks           - Get all available tracks")
     print("   GET  /api/network-status   - Get network topology and status")
     print("   GET  /api/system-info      - Get system configuration")
     print("="*50)

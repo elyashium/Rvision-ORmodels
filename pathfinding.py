@@ -1,6 +1,7 @@
 # pathfinding.py
 import heapq
 import json
+from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 
@@ -94,9 +95,14 @@ class NetworkGraph:
     def disable_track(self, track_id: str, reason: str = "failure"):
         """Disable a track due to failure or maintenance."""
         if track_id in self.tracks:
-            self.tracks[track_id]["status"] = "disabled"
+            # Store original status before disabling
+            if "original_status" not in self.tracks[track_id]:
+                self.tracks[track_id]["original_status"] = self.tracks[track_id].get("status", "operational")
+            
+            self.tracks[track_id]["status"] = "disabled" 
             self.tracks[track_id]["disable_reason"] = reason
-            self._build_adjacency_list()  # Rebuild adjacency list
+            self.tracks[track_id]["disabled_timestamp"] = datetime.now().isoformat()
+            self._build_adjacency_list()  # Rebuild adjacency list to exclude disabled tracks
             print(f"🚫 TRACK DISABLED: {track_id} - {reason}")
             return True
         return False
@@ -104,9 +110,15 @@ class NetworkGraph:
     def enable_track(self, track_id: str):
         """Re-enable a disabled track."""
         if track_id in self.tracks:
-            self.tracks[track_id]["status"] = "operational"
-            if "disable_reason" in self.tracks[track_id]:
-                del self.tracks[track_id]["disable_reason"]
+            # Restore original status or default to operational
+            original_status = self.tracks[track_id].get("original_status", "operational")
+            self.tracks[track_id]["status"] = original_status
+            
+            # Clean up failure-related metadata
+            for key in ["disable_reason", "disabled_timestamp", "original_status"]:
+                if key in self.tracks[track_id]:
+                    del self.tracks[track_id][key]
+                    
             self._build_adjacency_list()  # Rebuild adjacency list
             print(f"✅ TRACK ENABLED: {track_id}")
             return True

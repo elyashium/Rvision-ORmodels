@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Upload, Play, Square, AlertTriangle, Settings, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Upload, Play, Square, AlertTriangle, Settings, RefreshCw, Zap } from 'lucide-react';
 import DisruptionModal from './DisruptionModal';
+import TrackFailureModal from './TrackFailureModal';
 import SimulationControls from './SimulationControls';
 import { apiService, handleApiError } from '../services/apiService';
 
@@ -16,11 +17,36 @@ const ControlPanel = ({
   simulationTime = null,
   simulationSpeed = 1000,
   setSimulationSpeed = () => {},
-  onResetSimulation = () => {}
+  onResetSimulation = () => {},
+  // Live rerouting props
+  reportTrackFailure = null,
+  isPaused = false,
+  pauseReason = null
 }) => {
   const [isDisruptionModalOpen, setIsDisruptionModalOpen] = useState(false);
+  const [isTrackFailureModalOpen, setIsTrackFailureModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [availableTracks, setAvailableTracks] = useState([]);
+
+  // Load available tracks when component mounts
+  useEffect(() => {
+    const loadTracks = async () => {
+      try {
+        const response = await fetch('/api/tracks');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'success') {
+            setAvailableTracks(data.tracks || []);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load tracks:', error);
+      }
+    };
+
+    loadTracks();
+  }, []);
 
   const handleScheduleUpload = async () => {
     setIsLoading(true);
@@ -76,6 +102,15 @@ const ControlPanel = ({
     } catch (error) {
       console.error('Failed to report disruption:', error);
       throw error; // Re-throw so the modal can display the error
+    }
+  };
+
+  const handleTrackFailureSubmit = async (trackId, description) => {
+    if (reportTrackFailure) {
+      // Use the live rerouting function from useTrainSimulation
+      return await reportTrackFailure(trackId, description);
+    } else {
+      throw new Error('Track failure reporting not available');
     }
   };
 
@@ -195,6 +230,44 @@ const ControlPanel = ({
           />
         )}
 
+        {/* Pause Status Display */}
+        {isPaused && (
+          <div className="space-y-2">
+            <div className="bg-rail-warning/20 border border-rail-warning/30 rounded-md p-3">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-rail-warning rounded-full animate-pulse"></div>
+                <h4 className="text-sm font-medium text-rail-warning">Simulation Paused</h4>
+              </div>
+              <p className="text-xs text-rail-text-secondary mt-1">
+                {pauseReason || 'Simulation is currently paused'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Live Track Failure Reporting - Show if we have live rerouting capability */}
+        {simulationTrains.length > 0 && reportTrackFailure && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-medium text-rail-text-secondary uppercase tracking-wide">
+              Live Track Management
+            </h3>
+            
+            <button
+              onClick={() => setIsTrackFailureModalOpen(true)}
+              className="rail-button-danger w-full flex items-center justify-center space-x-2 hover:bg-rail-danger/90"
+              disabled={isLoading}
+            >
+              <Zap className="w-4 h-4" />
+              <span>Report Track Failure</span>
+            </button>
+            
+            <div className="text-xs text-rail-text-secondary bg-rail-light-blue/10 border border-rail-light-blue/30 rounded-md p-2">
+              <strong>Live Rerouting:</strong> Track failures will pause the simulation, 
+              automatically reroute affected trains, and resume with updated paths.
+            </div>
+          </div>
+        )}
+
         {/* Legacy Simulation Controls */}
         {networkState && (
           <div className="space-y-3">
@@ -292,6 +365,14 @@ const ControlPanel = ({
         onSubmit={handleDisruptionSubmit}
         trainOptions={getTrainOptions()}
         stationOptions={getStationOptions()}
+      />
+
+      {/* Track Failure Modal */}
+      <TrackFailureModal
+        isOpen={isTrackFailureModalOpen}
+        onClose={() => setIsTrackFailureModalOpen(false)}
+        onSubmit={handleTrackFailureSubmit}
+        availableTracks={availableTracks}
       />
     </div>
   );

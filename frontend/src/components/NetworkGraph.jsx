@@ -50,17 +50,62 @@ const NetworkGraph = ({
         });
       });
 
-      // Create track edges from network_graph.json
+      // Create track edges from network_graph.json with failure visualization
       Object.entries(networkData.tracks).forEach(([trackId, track]) => {
+        const isDisabled = track.status === 'disabled';
+        const isHighPriority = track.priority === 'high';
+        
+        // Dynamic styling based on track status
+        let edgeColor, edgeWidth, edgeDashes, edgeLabel;
+        
+        if (isDisabled) {
+          // Failed track styling
+          edgeColor = { color: '#dc3545', highlight: '#b02a37' }; // Red for failed tracks
+          edgeWidth = 3;
+          edgeDashes = [10, 5]; // Distinctive dashed pattern for failures
+          edgeLabel = `❌ ${track.travel_time_minutes}min (FAILED)`;
+        } else {
+          // Normal track styling
+          edgeColor = { color: isHighPriority ? '#495057' : '#6c757d' };
+          edgeWidth = isHighPriority ? 2 : 1;
+          edgeDashes = track.track_type === 'single_line' ? [5, 5] : false;
+          edgeLabel = `${track.travel_time_minutes}min`;
+        }
+        
+        let title = `${trackId} (${track.travel_time_minutes} min)\n${track.track_type}`;
+        if (track.max_speed_kmh) {
+          title += `, ${track.max_speed_kmh} km/h`;
+        }
+        
+        if (isDisabled) {
+          title += `\n🚫 TRACK FAILED: ${track.disable_reason || 'Unknown reason'}`;
+          if (track.disabled_timestamp) {
+            title += `\nFailed at: ${new Date(track.disabled_timestamp).toLocaleString()}`;
+          }
+        }
+        
         edges.add({
           id: trackId,
           from: track.from,
           to: track.to,
-          label: `${track.travel_time_minutes}min`,
-          color: { color: track.priority === 'high' ? '#495057' : '#6c757d' },
-          width: track.priority === 'high' ? 2 : 1,
-          dashes: track.track_type === 'single_line' ? [5, 5] : false,
-          title: `${trackId} (${track.travel_time_minutes} min)\n${track.track_type}, ${track.max_speed_kmh} km/h`
+          label: edgeLabel,
+          color: edgeColor,
+          width: edgeWidth,
+          dashes: edgeDashes,
+          title: title,
+          font: isDisabled ? { 
+            color: '#dc3545', 
+            size: 10, 
+            strokeWidth: 2, 
+            strokeColor: '#ffffff',
+            align: 'middle'
+          } : {
+            size: 8,
+            color: '#495057',
+            strokeWidth: 1,
+            strokeColor: '#ffffff',
+            align: 'middle'
+          }
         });
       });
 
@@ -584,6 +629,7 @@ const NetworkGraph = ({
         color: '#495057',
         strokeWidth: 1,
         strokeColor: '#ffffff',
+        align: 'middle'
       },
       smooth: {
         enabled: false, // Disable smooth edges for better performance
@@ -730,6 +776,72 @@ const NetworkGraph = ({
       }
     };
   }, []);
+
+  // Update network edges when track status changes (for failure visualization)
+  useEffect(() => {
+    if (networkInstance.current && networkData) {
+      const { edges } = getNetworkData();
+      const edgeDataSet = networkInstance.current.body.data.edges;
+      
+      // Update existing edges with new styling (failure states)
+      Object.entries(networkData.tracks || {}).forEach(([trackId, track]) => {
+        try {
+          const isDisabled = track.status === 'disabled';
+          const isHighPriority = track.priority === 'high';
+          
+          let edgeColor, edgeWidth, edgeDashes, edgeLabel;
+          
+          if (isDisabled) {
+            edgeColor = { color: '#dc3545', highlight: '#b02a37' };
+            edgeWidth = 3;
+            edgeDashes = [10, 5];
+            edgeLabel = `❌ ${track.travel_time_minutes}min (FAILED)`;
+          } else {
+            edgeColor = { color: isHighPriority ? '#495057' : '#6c757d' };
+            edgeWidth = isHighPriority ? 2 : 1;
+            edgeDashes = track.track_type === 'single_line' ? [5, 5] : false;
+            edgeLabel = `${track.travel_time_minutes}min`;
+          }
+          
+          let title = `${trackId} (${track.travel_time_minutes} min)\n${track.track_type}`;
+          if (track.max_speed_kmh) {
+            title += `, ${track.max_speed_kmh} km/h`;
+          }
+          if (isDisabled) {
+            title += `\n🚫 TRACK FAILED: ${track.disable_reason || 'Unknown reason'}`;
+            if (track.disabled_timestamp) {
+              title += `\nFailed at: ${new Date(track.disabled_timestamp).toLocaleString()}`;
+            }
+          }
+          
+          edgeDataSet.update({
+            id: trackId,
+            color: edgeColor,
+            width: edgeWidth,
+            dashes: edgeDashes,
+            label: edgeLabel,
+            title: title,
+            font: isDisabled ? { 
+              color: '#dc3545', 
+              size: 10, 
+              strokeWidth: 2, 
+              strokeColor: '#ffffff',
+              align: 'middle'
+            } : {
+              size: 8,
+              color: '#495057',
+              strokeWidth: 1,
+              strokeColor: '#ffffff',
+              align: 'middle'
+            }
+          });
+          
+        } catch (error) {
+          // Edge might not exist in the dataset, skip silently
+        }
+      });
+    }
+  }, [networkData?.tracks]); // Re-run when track data changes
 
   // Update train positions during live simulation
   useEffect(() => {
@@ -951,6 +1063,10 @@ const NetworkGraph = ({
           <div className="flex items-center space-x-2">
             <div className="w-4 h-0.5 bg-rail-light-blue"></div>
             <span>Main Track</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="w-4 h-0.5 bg-rail-danger" style={{borderStyle: 'dashed', borderWidth: '1px 0'}}></div>
+            <span>Failed Track</span>
           </div>
         </div>
       </div>

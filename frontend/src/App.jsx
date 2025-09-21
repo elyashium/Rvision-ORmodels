@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Train, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
 import ControlPanel from './components/ControlPanel';
 import NetworkGraph from './components/NetworkGraph';
+import ErrorBoundary from './components/ErrorBoundary';
 import AlertsAndRecommendations from './components/AlertsAndRecommendations';
 import MultiStrategySimulation from './components/MultiStrategySimulation';
 import SimulationClock from './components/SimulationClock';
@@ -20,19 +21,26 @@ function App() {
   const [isNetworkFullscreen, setIsNetworkFullscreen] = useState(false);
   const [currentStrategy, setCurrentStrategy] = useState(null); // Track current strategy for visualization
 
-  // Live simulation state
+  // Live simulation state with live rerouting
   const {
     networkData,
     trains: simulationTrains,
     simulationTime,
     simulationSpeed,
     isRunning: isLiveSimulationRunning,
+    isPaused,
+    pauseReason,
     loadSchedule,
     loadStrategySimulation,
     startSimulation: startLiveSimulation,
     stopSimulation: stopLiveSimulation,
     resetSimulation,
-    setSimulationSpeed
+    setSimulationSpeed,
+    // Live rerouting functions
+    pauseSimulation,
+    resumeSimulation,
+    reportTrackFailure,
+    updateTrainRoutes
   } = useTrainSimulation();
 
   // Fetch initial system state
@@ -343,6 +351,10 @@ function App() {
               simulationSpeed={simulationSpeed}
               setSimulationSpeed={setSimulationSpeed}
               onResetSimulation={resetSimulation}
+              // Live rerouting props
+              reportTrackFailure={reportTrackFailure}
+              isPaused={isPaused}
+              pauseReason={pauseReason}
               // Pass panel content for consistent layout
               leftPanelContent={
                 <ControlPanel
@@ -357,6 +369,9 @@ function App() {
                   simulationSpeed={simulationSpeed}
                   setSimulationSpeed={setSimulationSpeed}
                   onResetSimulation={resetSimulation}
+                  reportTrackFailure={reportTrackFailure}
+                  isPaused={isPaused}
+                  pauseReason={pauseReason}
                 />
               }
               rightPanelContent={
@@ -386,7 +401,8 @@ function App() {
           <div className="flex-1 flex gap-3 min-h-0">
             {/* Network Visualization */}
             <div className="flex-1 rail-card p-3 min-h-0">
-              <NetworkGraph
+              <ErrorBoundary showDetails={true}>
+                <NetworkGraph
                 networkState={networkState}
                 isSimulationRunning={isSimulationRunning}
                 onFullscreenChange={setIsNetworkFullscreen}
@@ -410,6 +426,10 @@ function App() {
                     simulationSpeed={simulationSpeed}
                     setSimulationSpeed={setSimulationSpeed}
                     onResetSimulation={resetSimulation}
+                    // Live rerouting props
+                    reportTrackFailure={reportTrackFailure}
+                    isPaused={isPaused}
+                    pauseReason={pauseReason}
                   />
                 }
                 rightPanelContent={
@@ -433,6 +453,7 @@ function App() {
                   )
                 }
               />
+              </ErrorBoundary>
             </div>
 
             {/* Right Panel - Clock and Alerts */}
@@ -478,7 +499,8 @@ function App() {
       ) : (
         /* Fullscreen Network Visualization */
         <div className="h-screen">
-          <NetworkGraph
+          <ErrorBoundary showDetails={true}>
+            <NetworkGraph
             networkState={networkState}
             isSimulationRunning={isSimulationRunning}
             onFullscreenChange={setIsNetworkFullscreen}
@@ -502,6 +524,10 @@ function App() {
                 simulationSpeed={simulationSpeed}
                 setSimulationSpeed={setSimulationSpeed}
                 onResetSimulation={resetSimulation}
+                // Live rerouting props
+                reportTrackFailure={reportTrackFailure}
+                isPaused={isPaused}
+                pauseReason={pauseReason}
               />
             }
             rightPanelContent={
@@ -541,6 +567,7 @@ function App() {
               </div>
             }
           />
+          </ErrorBoundary>
         </div>
       )}
     </div>

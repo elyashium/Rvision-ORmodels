@@ -1,0 +1,274 @@
+{
+  "stations": {
+    "NDLS": {
+      "name": "New Delhi",
+      "type": "major_terminal",
+      "platforms": 16,
+      "latitude": 28.6418,
+      "longitude": 77.2213
+    },
+    "GZB": {
+      "name": "Ghaziabad",
+      "type": "junction",
+      "platforms": 6,
+      "latitude": 28.6615,
+      "longitude": 77.4388
+    },
+    "SBB": {
+      "name": "Sahibabad",
+      "type": "station",
+      "platforms": 4,
+      "latitude": 28.6520,
+      "longitude": 77.3343
+    },
+    "VVB": {
+      "name": "Vivek Vihar",
+      "type": "station",
+      "platforms": 2,
+      "latitude": 28.6464,
+      "longitude": 77.3140
+    },
+    "ANVT": {
+      "name": "Anand Vihar Terminal",
+      "type": "terminal",
+      "platforms": 7,
+      "latitude": 28.6467,
+      "longitude": 77.3034
+    },
+    "CNB": {
+      "name": "Kanpur Central",
+      "type": "major_junction",
+      "platforms": 10,
+      "latitude": 26.4499,
+      "longitude": 80.3319
+    },
+    "AGC": {
+      "name": "Agra Cantt",
+      "type": "junction",
+      "platforms": 6,
+      "latitude": 27.1767,
+      "longitude": 78.0081
+    },
+    "TDL": {
+      "name": "Tundla Junction",
+      "type": "junction",
+      "platforms": 5,
+      "latitude": 27.2048,
+      "longitude": 78.2379
+    },
+    "ALJN": {
+      "name": "Aligarh Junction",
+      "type": "junction",
+      "platforms": 7,
+      "latitude": 27.8974,
+      "longitude": 78.0880
+    },
+    "MTJ": {
+      "name": "Mathura Junction",
+      "type": "junction",
+      "platforms": 10,
+      "latitude": 27.4924,
+      "longitude": 77.6737
+    },
+    "SHZM": {
+      "name": "Sabzi Mandi",
+      "type": "station",
+      "platforms": 3,
+      "latitude": 28.6724,
+      "longitude": 77.2077
+    }
+  },
+  "tracks": {
+    "TR001": {
+      "from": "NDLS",
+      "to": "SHZM",
+      "distance_km": 5,
+      "travel_time_minutes": 10,
+      "status": "operational",
+      "capacity_trains_per_hour": 8,
+      "track_type": "double"
+    },
+    "TR002": {
+      "from": "SHZM",
+      "to": "VVB",
+      "distance_km": 8,
+      "travel_time_minutes": 15,
+      "status": "operational",
+      "capacity_trains_per_hour": 6,
+      "track_type": "double"
+    },
+    "TR003": {
+      "from": "VVB",
+      "to": "ANVT",
+      "distance_km": 2,
+      "travel_time_minutes": 5,
+      "status": "operational",
+      "capacity_trains_per_hour": 6,
+      "track_type": "double"
+    },
+    "TR004": {
+      "from": "ANVT",
+      "to": "SBB",
+      "distance_km": 4,
+      "travel_time_minutes": 8,
+      "status": "operational",
+      "capacity_trains_per_hour": 6,
+      "track_type": "double"
+    },
+    "TR005": {
+      "from": "SBB",
+      "to": "GZB",
+      "distance_km": 12,
+      "travel_time_minutes": 20,
+      "status": "operational",
+      "capacity_trains_per_hour": 10,
+      "track_type": "quadruple"
+    },
+    "TR006": {
+      "from": "NDLS",
+      "to": "GZB",
+      "distance_km": 20,
+      "travel_time_minutes": 30,
+      "status": "operational",
+      "capacity_trains_per_hour": 12,
+      "track_type": "quadruple"
+    },
+    "TR007": {
+      "from": "GZB",
+      "to": "ALJN",
+      "distance_km": 110,
+      "travel_time_minutes": 90,
+      "status": "operational",
+      "capacity_trains_per_hour": 8,
+      "track_type": "double"
+    },
+    "TR008": {
+      "from": "ALJN",
+      "to": "TDL",
+      "distance_km": 40,
+      "travel_time_minutes": 35,
+      "status": "operational",
+      "capacity_trains_per_hour": 6,
+      "track_type": "double"
+    },
+    "TR009": {
+      "from": "TDL",
+      "to": "AGC",
+      "distance_km": 25,
+      "travel_time_minutes": 25,
+      "status": "operational",
+      "capacity_trains_per_hour": 6,
+      "track_type": "double"
+    },
+    "TR010": {
+      "from": "AGC",
+      "to": "MTJ",
+      "distance_km": 50,
+      "travel_time_minutes": 45,
+      "status": "operational",
+      "capacity_trains_per_hour": 8,
+      "track_type": "double"
+    },
+    "TR011": {
+      "from": "MTJ",
+      "to": "NDLS",
+      "distance_km": 145,
+      "travel_time_minutes": 120,
+      "status": "operational",
+      "capacity_trains_per_hour": 10,
+      "track_type": "double"
+    },
+    "TR012": {
+      "from": "TDL",
+      "to": "CNB",
+      "distance_km": 225,
+      "travel_time_minutes": 180,
+      "status": "operational",
+      "capacity_trains_per_hour": 8,
+      "track_type": "double"
+    },
+    "TR013": {
+      "from": "ALJN",
+      "to": "CNB",
+      "distance_km": 260,
+      "travel_time_minutes": 210,
+      "status": "operational",
+      "capacity_trains_per_hour": 6,
+      "track_type": "double"
+    },
+    "TR014": {
+      "from": "NDLS",
+      "to": "VVB",
+      "distance_km": 10,
+      "travel_time_minutes": 18,
+      "status": "operational",
+      "capacity_trains_per_hour": 4,
+      "track_type": "single"
+    }
+  },
+  "trains": [
+    {
+      "id": "T100",
+      "name": "Rajdhani Express",
+      "current_node": "NDLS",
+      "destination": "CNB",
+      "priority": 1,
+      "delay": 0,
+      "type": "express",
+      "scheduled_departure": "08:00",
+      "speed_kmph": 120
+    },
+    {
+      "id": "T200",
+      "name": "Shatabdi Express",
+      "current_node": "GZB",
+      "destination": "AGC",
+      "priority": 1,
+      "delay": 0,
+      "type": "express",
+      "scheduled_departure": "06:30",
+      "speed_kmph": 140
+    },
+    {
+      "id": "T300",
+      "name": "Local Passenger",
+      "current_node": "ANVT",
+      "destination": "GZB",
+      "priority": 3,
+      "delay": 0,
+      "type": "passenger",
+      "scheduled_departure": "09:00",
+      "speed_kmph": 60
+    },
+    {
+      "id": "T400",
+      "name": "Intercity Express",
+      "current_node": "MTJ",
+      "destination": "NDLS",
+      "priority": 2,
+      "delay": 0,
+      "type": "intercity",
+      "scheduled_departure": "07:15",
+      "speed_kmph": 90
+    },
+    {
+      "id": "T500",
+      "name": "Freight Train",
+      "current_node": "TDL",
+      "destination": "CNB",
+      "priority": 5,
+      "delay": 0,
+      "type": "freight",
+      "scheduled_departure": "10:00",
+      "speed_kmph": 50
+    }
+  ],
+  "meta": {
+    "version": "1.0.0",
+    "generated_at": "2024-01-01T00:00:00Z",
+    "network_name": "North Central Railway Zone",
+    "total_route_km": 1094,
+    "total_stations": 11,
+    "total_tracks": 14
+  }
+}

@@ -1,0 +1,19 @@
+# FastAPI Railway Optimization Backend Dependencies (Flexible Versions)
+# This file allows pip to find compatible versions automatically
+
+fastapi
+uvicorn[standard]
+networkx
+numpy
+pydantic
+python-multipart
+aiofiles
+websockets
+
+# Optional dependencies (comment out if not needed)
+# python-jose[cryptography]
+# passlib[bcrypt]
+# python-dotenv
+# redis
+# celery
+# httpx

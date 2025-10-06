@@ -11,13 +11,21 @@ class Train:
         self.id: str = train_data['Train_ID']
         self.train_type: str = train_data.get('Train_Type', 'Express')  # Express, Goods, Local
         
-        # Journey details
-        self.section_start: str = train_data['Section_Start']
-        self.section_end: str = train_data['Section_End']
-        
-        # Schedule information
-        self.scheduled_departure_time: str = train_data['Scheduled_Departure_Time']
-        self.scheduled_arrival_time: str = train_data['Scheduled_Arrival_Time']
+        # Journey details - handle both old and new formats
+        if 'Route' in train_data and train_data['Route']:
+            # New enhanced format with Route array
+            route = train_data['Route']
+            self.section_start: str = route[0]['Station_ID']
+            self.section_end: str = route[-1]['Station_ID']
+            # Use first departure and last arrival for schedule times
+            self.scheduled_departure_time: str = route[0]['Departure_Time']
+            self.scheduled_arrival_time: str = route[-1]['Arrival_Time']
+        else:
+            # Old format
+            self.section_start: str = train_data['Section_Start']
+            self.section_end: str = train_data['Section_End']
+            self.scheduled_departure_time: str = train_data['Scheduled_Departure_Time']
+            self.scheduled_arrival_time: str = train_data['Scheduled_Arrival_Time']
         self.day_of_week: str = train_data.get('Day_of_Week', 'Monday')
         self.time_of_day: str = train_data.get('Time_of_Day', 'Morning_Peak')
         
@@ -120,7 +128,8 @@ class Train:
             "day_of_week": self.day_of_week,
             "time_of_day": self.time_of_day,
             "weather": self.weather,
-            "track_condition": self.track_condition
+            "track_condition": self.track_condition,
+            "visual_route_path": getattr(self, 'visual_route_path', [self.section_start, self.section_end])
         }
 
     def apply_delay(self, additional_delay_mins: int, reason: str = "Unknown") -> None:
@@ -141,14 +150,73 @@ class Train:
         self.primary_route = primary_route
         self.alternative_routes = alternative_routes or []
         self.current_route = primary_route
+        
+        # Store the visual route path for frontend to follow exact tracks
+        if primary_route and primary_route.segments:
+            self.visual_route_path = [seg.from_station for seg in primary_route.segments] + [primary_route.segments[-1].to_station]
+        else:
+            # Fallback to direct route
+            self.visual_route_path = [self.section_start, self.section_end]
     
     def switch_to_alternative_route(self, route_index: int = 0) -> bool:
         """Switch to an alternative route."""
         if route_index < len(self.alternative_routes):
             self.current_route = self.alternative_routes[route_index]
+            additional_delay = max(0, self.current_route.total_time_minutes - (self.primary_route.total_time_minutes if self.primary_route else 0))
+            self.actual_delay_mins += additional_delay
             self.status = f"Rerouted via {self.current_route.route_type} route"
+            
+            # Update visual route path for the new route
+            if self.current_route and self.current_route.segments:
+                self.visual_route_path = [seg.from_station for seg in self.current_route.segments] + [self.current_route.segments[-1].to_station]
+            
+            print(f"🔀 {self.get_name()} switched to alternative route {route_index + 1}")
+            print(f"   New route: {self.current_route.route_type} via {len(self.current_route.stations)} stations")
+            print(f"   Visual path: {' → '.join(self.visual_route_path)}")
+            print(f"   Additional delay: {additional_delay} minutes")
+            
             return True
         return False
+
+    def apply_halt(self, halt_duration_mins: int, reason: str = "Optimization") -> bool:
+        """Apply a halt to the train for a specified duration."""
+        self.actual_delay_mins += halt_duration_mins
+        self.status = f"Halted ({reason}) - {halt_duration_mins} min"
+        
+        print(f"⏸️ {self.get_name()} halted for {halt_duration_mins} minutes")
+        print(f"   Reason: {reason}")
+        print(f"   Total delay now: {self.actual_delay_mins} minutes")
+        
+        return True
+
+    def apply_cancellation(self, reason: str = "Optimization") -> bool:
+        """Cancel the train service."""
+        self.status = f"Cancelled ({reason})"
+        
+        print(f"❌ {self.get_name()} cancelled")
+        print(f"   Reason: {reason}")
+        
+        return True
+
+    def apply_speed_adjustment(self, adjustment_factor: float, reason: str = "Optimization") -> bool:
+        """Apply speed adjustment to the train."""
+        # Adjust the scheduled times based on speed factor
+        if adjustment_factor > 1.0:
+            # Slower - add delay
+            additional_delay = int((adjustment_factor - 1.0) * 60)  # Convert factor to minutes
+            self.actual_delay_mins += additional_delay
+            self.status = f"Speed Reduced ({reason})"
+        elif adjustment_factor < 1.0:
+            # Faster - potentially reduce delay
+            time_saved = int((1.0 - adjustment_factor) * 60)
+            self.actual_delay_mins = max(0, self.actual_delay_mins - time_saved)
+            self.status = f"Speed Increased ({reason})"
+        
+        print(f"🚅 {self.get_name()} speed adjusted by {adjustment_factor:.2f}x")
+        print(f"   Reason: {reason}")
+        print(f"   Current delay: {self.actual_delay_mins} minutes")
+        
+        return True
     
     def get_current_route_info(self) -> Dict[str, Any]:
         """Get information about the current route."""
@@ -180,6 +248,7 @@ class RailwayNetwork:
         # Initialize network graph and route optimizer
         self.network_graph = NetworkGraph("network_graph.json")
         self.route_optimizer = RouteOptimizer(self.network_graph)
+        print(f"🗺️ Route optimizer initialized with {self.route_optimizer.pathfinding_strategy} strategy")
         
         # Initialize all trains from the schedule data
         self.trains: Dict[str, Train] = {
@@ -276,6 +345,194 @@ class RailwayNetwork:
         print(f"   Reason: {reason}")
         
         return True
+
+    def apply_action(self, action_data: Dict) -> bool:
+        """
+        Apply a recommended action from the optimizer to the network.
+        This implements the actual action (Halt, Reroute, Cancel, etc.)
+        """
+        action_type = action_data.get('action_type')
+        train_id = action_data.get('train_id')
+        
+        if not train_id:
+            print(f"ERROR: No train_id provided in action data")
+            return False
+            
+        train = self.get_train(train_id)
+        if not train:
+            print(f"ERROR: Train {train_id} not found in network.")
+            return False
+        
+        print(f"🔧 APPLYING ACTION: {action_type} to {train.get_name()}")
+        
+        success = False
+        
+        if action_type == "Halt":
+            duration_mins = action_data.get('duration_mins', 10)
+            success = train.apply_halt(duration_mins, "AI Optimization")
+            
+        elif action_type == "Reroute":
+            route_index = action_data.get('route_index', 0)
+            success = train.switch_to_alternative_route(route_index)
+            
+        elif action_type == "Cancel":
+            success = train.apply_cancellation("AI Optimization")
+            
+        elif action_type == "SpeedAdjust":
+            speed_factor = action_data.get('speed_factor', 1.0)
+            success = train.apply_speed_adjustment(speed_factor, "AI Optimization")
+            
+        else:
+            print(f"ERROR: Unknown action type: {action_type}")
+            return False
+        
+        if success:
+            print(f"✅ ACTION APPLIED: {action_type} successfully applied to {train.get_name()}")
+        else:
+            print(f"❌ ACTION FAILED: Could not apply {action_type} to {train.get_name()}")
+            
+        return success
+
+    def save_current_schedule(self, filename: str = "modified_schedule.json") -> bool:
+        """
+        Save the current network state as a schedule file in frontend-compatible format.
+        This creates a new schedule reflecting all applied actions.
+        """
+        try:
+            import json
+            from datetime import datetime, timedelta
+            
+            # Convert current network state to frontend simulation format
+            schedule_data = []
+            
+            for train in self.trains.values():
+                # Calculate adjusted departure/arrival times based on delays
+                try:
+                    # Use today's date as the base for creating full datetime objects
+                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    
+                    # Handle both full datetime and time-only strings gracefully
+                    try:
+                        base_departure = datetime.strptime(train.scheduled_departure_time, "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        base_departure = datetime.strptime(f"{today_str} {train.scheduled_departure_time}", "%Y-%m-%d %H:%M:%S")
+
+                    try:
+                        base_arrival = datetime.strptime(train.scheduled_arrival_time, "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        base_arrival = datetime.strptime(f"{today_str} {train.scheduled_arrival_time}", "%Y-%m-%d %H:%M:%S")
+
+                    # Apply delays
+                    actual_departure = base_departure + timedelta(minutes=train.actual_delay_mins)
+                    actual_arrival = base_arrival + timedelta(minutes=train.actual_delay_mins)
+                    
+                    # Create route array with adjusted times
+                    route = []
+                    
+                    # Add intermediate stations if available from current route
+                    if train.current_route and hasattr(train.current_route, 'stations') and len(train.current_route.stations) > 2:
+                        stations = train.current_route.stations
+                        total_journey_time = (actual_arrival - actual_departure).total_seconds() / 60  # minutes
+                        
+                        for i, station in enumerate(stations):
+                            if i == 0:
+                                # Origin station
+                                route.append({
+                                    "Station_ID": station,
+                                    "Station_Name": station,
+                                    "Arrival_Time": None,
+                                    "Departure_Time": actual_departure.strftime("%Y-%m-%d %H:%M:%S"),
+                                    "Platform": "1"
+                                })
+                            elif i == len(stations) - 1:
+                                # Destination station
+                                route.append({
+                                    "Station_ID": station,
+                                    "Station_Name": station,
+                                    "Arrival_Time": actual_arrival.strftime("%Y-%m-%d %H:%M:%S"),
+                                    "Departure_Time": None,
+                                    "Platform": "1"
+                                })
+                            else:
+                                # Intermediate station - calculate proportional time
+                                proportion = i / (len(stations) - 1)
+                                station_time = actual_departure + timedelta(minutes=total_journey_time * proportion)
+                                
+                                route.append({
+                                    "Station_ID": station,
+                                    "Station_Name": station,
+                                    "Arrival_Time": station_time.strftime("%Y-%m-%d %H:%M:%S"),
+                                    "Departure_Time": (station_time + timedelta(minutes=2)).strftime("%Y-%m-%d %H:%M:%S"),  # 2 min stop
+                                    "Platform": "1"
+                                })
+                    else:
+                        # Simple 2-station route
+                        route = [
+                            {
+                                "Station_ID": train.section_start,
+                                "Station_Name": train.section_start,
+                                "Arrival_Time": None,
+                                "Departure_Time": actual_departure.strftime("%Y-%m-%d %H:%M:%S"),
+                                "Platform": "1"
+                            },
+                            {
+                                "Station_ID": train.section_end,
+                                "Station_Name": train.section_end,
+                                "Arrival_Time": actual_arrival.strftime("%Y-%m-%d %H:%M:%S"),
+                                "Departure_Time": None,
+                                "Platform": "1"
+                            }
+                        ]
+                    
+                except Exception as e:
+                    print(f"Warning: Could not parse time for train {train.id}, using fallback. Error: {e}")
+                    # Fallback for invalid time formats
+                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    route = [
+                        {
+                            "Station_ID": train.section_start,
+                            "Station_Name": train.section_start,
+                            "Arrival_Time": None,
+                            "Departure_Time": f"{today_str} 06:00:00",
+                            "Platform": "1"
+                        },
+                        {
+                            "Station_ID": train.section_end,
+                            "Station_Name": train.section_end,
+                            "Arrival_Time": f"{today_str} 08:00:00",
+                            "Departure_Time": None,
+                            "Platform": "1"
+                        }
+                    ]
+                
+                # Create train entry in frontend simulation format
+                train_entry = {
+                    "Train_ID": train.id,
+                    "Train_Type": train.train_type,
+                    "Train_Name": train.get_name(),
+                    "Route": route,
+                    "status": train.status,
+                    "current_delay_mins": train.actual_delay_mins,
+                    "weather": train.weather,
+                    "track_condition": train.track_condition,
+                    "day_of_week": train.day_of_week,
+                    "time_of_day": train.time_of_day
+                }
+                
+                schedule_data.append(train_entry)
+            
+            # Save to file
+            with open(filename, 'w') as f:
+                json.dump(schedule_data, f, indent=2)
+            
+            print(f"💾 SCHEDULE SAVED: Current network state saved to {filename}")
+            print(f"   {len(schedule_data)} trains included in schedule")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ ERROR SAVING SCHEDULE: {str(e)}")
+            return False
     
     def _handle_track_failure_event(self, event_data: Dict) -> bool:
         """Handle track failure events that affect the entire network."""
@@ -341,8 +598,117 @@ class RailwayNetwork:
                     if segment.track_id == track_id:
                         affected_trains.append(train)
                         break
+            
+            # Also check if train's visual_route_path uses track stations
+            # This helps with trains that don't have detailed route segments
+            if hasattr(train, 'visual_route_path') and train.visual_route_path:
+                track_data = self.network_graph.tracks.get(track_id, {})
+                from_station = track_data.get('from')
+                to_station = track_data.get('to')
+                
+                if from_station and to_station:
+                    # Check if this track's stations are in the train's path
+                    path = train.visual_route_path
+                    for i in range(len(path) - 1):
+                        if ((path[i] == from_station and path[i + 1] == to_station) or
+                            (path[i] == to_station and path[i + 1] == from_station)):
+                            if train not in affected_trains:
+                                affected_trains.append(train)
+                            break
         
         return affected_trains
+
+    def recalculate_routes_for_trains(self, train_ids: List[str]) -> Dict[str, Any]:
+        """
+        Recalculate routes for specific trains only. 
+        This is used for live rerouting when tracks fail.
+        
+        Returns:
+            Dict with updated train routes and rerouting information
+        """
+        updated_trains = {}
+        rerouting_info = []
+        
+        for train_id in train_ids:
+            train = self.get_train(train_id)
+            if not train:
+                continue
+                
+            print(f"🔄 LIVE REROUTING: Recalculating route for train {train_id}")
+            
+            # Store original route for comparison
+            original_route = train.current_route
+            original_path = getattr(train, 'visual_route_path', [])
+            
+            # Find new primary route
+            new_primary_route = self.route_optimizer.find_best_route(
+                train.section_start, 
+                train.section_end, 
+                train.train_type, 
+                "time"
+            )
+            
+            # Find new alternative routes
+            new_alternative_routes = self.route_optimizer.find_alternative_routes(
+                train.section_start, 
+                train.section_end, 
+                train.train_type, 
+                max_alternatives=2
+            )
+            
+            # Remove new primary route from alternatives if it appears there
+            new_alternative_routes = [r for r in new_alternative_routes if r != new_primary_route]
+            
+            if new_primary_route:
+                # Update train's routes
+                train.set_routes(new_primary_route, new_alternative_routes)
+                
+                # Calculate rerouting impact
+                time_impact = 0
+                if original_route:
+                    time_impact = new_primary_route.total_time_minutes - original_route.total_time_minutes
+                
+                reroute_info = {
+                    "train_id": train_id,
+                    "train_name": train.get_name(),
+                    "success": True,
+                    "original_path": original_path,
+                    "new_path": train.visual_route_path,
+                    "time_impact_minutes": max(0, time_impact),
+                    "new_route_type": new_primary_route.route_type,
+                    "alternatives_available": len(new_alternative_routes)
+                }
+                
+                # Apply time impact as delay if route is longer
+                if time_impact > 0:
+                    train.apply_delay(time_impact, f"Rerouted due to track failure (+{time_impact}min)")
+                
+                updated_trains[train_id] = train.get_current_status_info()
+                
+                print(f"   ✅ New route: {' → '.join(train.visual_route_path)}")
+                print(f"   ⏱️  Impact: +{time_impact} minutes")
+                
+            else:
+                reroute_info = {
+                    "train_id": train_id,
+                    "train_name": train.get_name(),
+                    "success": False,
+                    "error": "No alternative route available",
+                    "original_path": original_path,
+                    "new_path": [],
+                    "time_impact_minutes": 0
+                }
+                
+                print(f"   ❌ No alternative route found for {train_id}")
+            
+            rerouting_info.append(reroute_info)
+        
+        return {
+            "updated_trains": updated_trains,
+            "rerouting_info": rerouting_info,
+            "total_affected": len(train_ids),
+            "successfully_rerouted": len([r for r in rerouting_info if r["success"]])
+        }
 
     def get_state_snapshot(self) -> Dict:
         """

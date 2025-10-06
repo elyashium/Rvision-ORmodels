@@ -1,0 +1,146 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', sans-serif;
+  line-height: 1.4;
+  font-weight: 400;
+  color-scheme: light;
+  color: #1a1a1a;
+  background-color: #ffffff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  height: 100vh;
+  max-height: 100vh;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+#root {
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #dee2e6;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6c757d;
+}
+
+/* Custom component styles */
+.rail-card {
+  @apply bg-rail-dark border border-rail-gray rounded-lg shadow-sm;
+}
+
+.rail-button-primary {
+  @apply bg-rail-text hover:bg-rail-text-secondary text-white font-medium py-1.5 px-3 rounded-md transition-all duration-200 shadow-sm text-sm;
+}
+
+.rail-button-secondary {
+  @apply bg-rail-gray hover:bg-rail-light-gray text-rail-text font-medium py-1.5 px-3 rounded-md transition-all duration-200 text-sm border border-rail-gray;
+}
+
+.rail-button-danger {
+  @apply bg-rail-danger hover:bg-red-600 text-white font-medium py-1.5 px-3 rounded-md transition-all duration-200 text-sm;
+}
+
+.rail-button-info {
+  @apply bg-rail-info hover:bg-blue-600 text-white font-medium py-1.5 px-3 rounded-md transition-all duration-200 text-sm;
+}
+
+.rail-input {
+  @apply bg-rail-darker border border-rail-gray rounded-md px-2.5 py-1.5 text-rail-text placeholder-rail-text-secondary focus:border-rail-text focus:ring-1 focus:ring-rail-text/20 transition-colors text-sm;
+}
+
+.rail-select {
+  @apply bg-rail-darker border border-rail-gray rounded-md px-2.5 py-1.5 text-rail-text focus:border-rail-text focus:ring-1 focus:ring-rail-text/20 transition-colors text-sm;
+}
+
+.status-indicator {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+}
+
+.status-on-time {
+  @apply bg-rail-success/20 text-rail-success border border-rail-success/30;
+}
+
+.status-delayed {
+  @apply bg-rail-warning/20 text-rail-warning border border-rail-warning/30;
+}
+
+.status-critical {
+  @apply bg-rail-danger/20 text-rail-danger border border-rail-danger/30;
+}
+
+/* Premium header notch style */
+.notch-header {
+  @apply fixed top-4 left-1/2 transform -translate-x-1/2 z-50;
+  @apply bg-rail-darker border border-rail-gray rounded-full;
+  @apply px-4 py-2 shadow-sm backdrop-blur-sm;
+  @apply transition-all duration-500 ease-in-out;
+  max-width: 200px;
+}
+
+.notch-header:hover {
+  @apply px-6 py-3 shadow-lg;
+  @apply bg-black border-black;
+  max-width: 600px;
+}
+
+/* Force all text and icons to white on hover */
+.notch-header:hover * {
+  @apply text-white !important;
+  color: white !important;
+}
+
+.notch-content {
+  @apply flex items-center justify-center space-x-2;
+  @apply transition-all duration-500 ease-in-out;
+}
+
+.notch-header:hover .notch-content {
+  @apply space-x-4;
+}
+
+.notch-expanded {
+  @apply opacity-0 max-w-0 overflow-hidden;
+  @apply transition-all duration-500 ease-in-out;
+}
+
+.notch-header:hover .notch-expanded {
+  @apply opacity-100 max-w-none;
+}
+
+/* Animation utilities */
+.animate-train-move {
+  animation: trainMove 2s linear infinite;
+}
+
+@keyframes trainMove {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(10px); }
+}

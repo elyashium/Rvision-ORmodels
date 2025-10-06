@@ -2,7 +2,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from models import RailwayNetwork
-from optimizer import Optimizer, PRIORITY_WEIGHTS, ACTION_PENALTIES
+from optimizer import Optimizer, MultiStrategyOptimizer, PRIORITY_WEIGHTS, ACTION_PENALTIES
 import json
 import os
 from typing import Dict, Any
@@ -14,18 +14,22 @@ CORS(app)  # Enable CORS for frontend integration
 # Global variables to hold our system components
 network: RailwayNetwork = None
 optimizer: Optimizer = None
+multi_strategy_optimizer: MultiStrategyOptimizer = None
 initial_schedule_data = None
 
 def initialize_system():
     """Initialize the railway network and optimizer from schedule data."""
-    global network, optimizer, initial_schedule_data
+    global network, optimizer, multi_strategy_optimizer, initial_schedule_data
     
     try:
-        # Load the initial schedule from file
-        schedule_file = 'schedule.json'
+        # Load the initial schedule from file (try enhanced first, fallback to basic)
+        schedule_file = 'enhanced_schedule.json'
         if not os.path.exists(schedule_file):
-            print(f"⚠️  Warning: {schedule_file} not found. Creating sample data...")
-            create_sample_schedule()
+            print(f"⚠️  Warning: {schedule_file} not found. Trying basic schedule...")
+            schedule_file = 'schedule.json'
+            if not os.path.exists(schedule_file):
+                print(f"⚠️  Warning: No schedule files found. Creating sample data...")
+                create_sample_schedule()
         
         with open(schedule_file, 'r') as f:
             initial_schedule_data = json.load(f)
@@ -33,10 +37,12 @@ def initialize_system():
         # Create our "World" (Digital Twin) and "Brain" (Optimizer)
         network = RailwayNetwork(initial_schedule_data)
         optimizer = Optimizer(PRIORITY_WEIGHTS, ACTION_PENALTIES)
+        multi_strategy_optimizer = MultiStrategyOptimizer(PRIORITY_WEIGHTS, ACTION_PENALTIES)
         
         print("🚂 R-Vision System Initialized Successfully!")
         print(f"   📊 Loaded {len(network.trains)} trains")
-        print(f"   🧠 Optimizer ready with {len(PRIORITY_WEIGHTS)} priority levels")
+        print(f"   🧠 Standard Optimizer ready with {len(PRIORITY_WEIGHTS)} priority levels")
+        print(f"   🎯 Multi-Strategy Optimizer ready with 3 strategies")
         
     except Exception as e:
         print(f"❌ Error initializing system: {e}")
@@ -103,7 +109,7 @@ def get_current_state():
 @app.route('/api/report-event', methods=['POST'])
 def report_event():
     """
-    Main endpoint: Report a disruption event and get AI recommendations.
+    Main endpoint: Report a disruption event and get multi-strategy AI recommendations.
     
     Expected JSON payload:
     {
@@ -114,7 +120,7 @@ def report_event():
     }
     """
     try:
-        if not network or not optimizer:
+        if not network or not multi_strategy_optimizer:
             return jsonify({"error": "System not initialized"}), 500
         
         # Get event data from request
@@ -139,19 +145,19 @@ def report_event():
                 "error": f"Failed to apply event to train {event_data.get('train_id')}"
             }), 400
         
-        # Step 2: Run the optimizer on the new state of the world
-        optimization_result = optimizer.run(network)
+        # Step 2: Run multi-strategy optimization and generate schedule data
+        multi_strategy_results = multi_strategy_optimizer.generate_strategy_schedules(network)
         
         # Step 3: Format the response
         response = {
             "status": "success",
             "event_processed": event_data,
             "network_state": network.get_state_snapshot(),
-            "optimization_result": optimization_result,
+            "simulations": multi_strategy_results,
             "timestamp": network.get_state_snapshot()["timestamp"]
         }
         
-        print(f"✅ EVENT PROCESSED: {optimization_result.get('status', 'Unknown')}")
+        print(f"✅ MULTI-STRATEGY ANALYSIS COMPLETED: {len(multi_strategy_results)} strategies evaluated")
         
         return jsonify(response)
     
@@ -163,7 +169,7 @@ def report_event():
 def accept_recommendation():
     """
     Accept and apply a recommendation from the optimizer.
-    This simulates the human operator accepting the AI's suggestion.
+    This applies the actual action to create a new network state.
     """
     try:
         if not network:
@@ -174,24 +180,45 @@ def accept_recommendation():
         if not recommendation_data or 'recommendation_id' not in recommendation_data:
             return jsonify({"error": "Invalid recommendation data"}), 400
         
-        # In a real system, you would apply the recommended action
-        # For the prototype, we'll just log it and update the train status
+        # Get the action from the recommendation
         action = recommendation_data.get('action', {})
-        train_id = action.get('train_id')
         
-        if train_id:
-            train = network.get_train(train_id)
-            if train:
-                train.status = f"Action Applied: {action.get('action_type', 'Unknown')}"
-                print(f"✅ RECOMMENDATION ACCEPTED: {action.get('description', 'No description')}")
+        if not action:
+            return jsonify({"error": "No action found in recommendation"}), 400
+        
+        print(f"🎯 PROCESSING RECOMMENDATION: {recommendation_data.get('recommendation_id')}")
+        print(f"   Action: {action.get('action_type')} for train {action.get('train_id')}")
+        
+        # Apply the recommended action to the network
+        success = network.apply_action(action)
+        
+        if not success:
+            return jsonify({
+                "error": f"Failed to apply action {action.get('action_type')} to train {action.get('train_id')}"
+            }), 400
+        
+        # Save the modified schedule to file
+        network.save_current_schedule("strategy_modified_schedule.json")
+        
+        # Get the updated network state after applying the action
+        updated_state = network.get_state_snapshot()
+        
+        print(f"✅ RECOMMENDATION ACCEPTED AND APPLIED SUCCESSFULLY!")
+        print(f"   Network state updated with {len(updated_state.get('trains', {}))} trains")
         
         return jsonify({
             "status": "success",
-            "message": "Recommendation accepted and applied",
-            "network_state": network.get_state_snapshot()
+            "message": f"Recommendation accepted and applied: {action.get('description', 'Action applied')}",
+            "network_state": updated_state,
+            "applied_action": {
+                "action_type": action.get('action_type'),
+                "train_id": action.get('train_id'),
+                "description": action.get('description')
+            }
         })
     
     except Exception as e:
+        print(f"❌ ERROR APPLYING RECOMMENDATION: {str(e)}")
         return jsonify({"error": f"Failed to accept recommendation: {str(e)}"}), 500
 
 @app.route('/api/reset', methods=['POST'])
@@ -238,13 +265,14 @@ def get_all_trains():
 @app.route('/api/track-failure', methods=['POST'])
 def report_track_failure():
     """
-    Report a track failure event.
+    Enhanced track failure endpoint with live rerouting capabilities.
     
     Expected JSON payload:
     {
         "track_id": "NDLS_ANVR_MAIN",
         "description": "Signal failure on main line",
-        "event_type": "track_failure"
+        "event_type": "track_failure",
+        "live_rerouting": true  // Optional: enables live rerouting
     }
     """
     try:
@@ -260,31 +288,60 @@ def report_track_failure():
         if 'track_id' not in event_data:
             return jsonify({"error": "Missing required field: track_id"}), 400
         
-        # Set event type
-        event_data['event_type'] = 'track_failure'
+        track_id = event_data['track_id']
+        live_rerouting = event_data.get('live_rerouting', True)  # Default to true for new feature
         
-        print(f"\n🚫 TRACK FAILURE REPORTED: {event_data}")
+        print(f"\n🚫 LIVE TRACK FAILURE REPORTED: {track_id}")
+        print(f"   Live rerouting: {'Enabled' if live_rerouting else 'Disabled'}")
         
-        # Apply the track failure event
-        success = network.apply_event(event_data)
+        # Step 1: Identify affected trains BEFORE disabling the track
+        affected_trains = network._find_trains_using_track(track_id)
+        affected_train_ids = [train.id for train in affected_trains]
+        
+        print(f"   📍 Identified {len(affected_trains)} affected trains: {affected_train_ids}")
+        
+        # Step 2: Disable the track
+        success = network.network_graph.disable_track(track_id, event_data.get('description', 'Track failure'))
         
         if not success:
             return jsonify({
-                "error": f"Failed to apply track failure for {event_data.get('track_id')}"
+                "error": f"Failed to disable track {track_id}. Track may not exist."
             }), 400
         
-        # Get updated network state
+        # Step 3: Live rerouting for affected trains
+        rerouting_results = None
+        if live_rerouting and affected_train_ids:
+            print(f"   🔄 Starting live rerouting for {len(affected_train_ids)} trains...")
+            rerouting_results = network.recalculate_routes_for_trains(affected_train_ids)
+            print(f"   ✅ Rerouting completed: {rerouting_results['successfully_rerouted']}/{rerouting_results['total_affected']} trains")
+        
+        # Step 4: Get updated network state
         network_state = network.get_state_snapshot()
         
+        # Step 5: Prepare response
         response = {
             "status": "success",
-            "event_processed": event_data,
+            "event_type": "track_failure",
+            "track_id": track_id,
+            "track_status": "disabled",
+            "affected_trains": affected_train_ids,
+            "live_rerouting_enabled": live_rerouting,
+            "rerouting_results": rerouting_results,
             "network_state": network_state,
-            "message": f"Track failure applied to {event_data.get('track_id')}. Alternative routes calculated.",
+            "message": f"Track {track_id} disabled. {len(affected_trains)} trains affected.",
             "timestamp": network_state["timestamp"]
         }
         
-        print(f"✅ TRACK FAILURE PROCESSED")
+        # Add detailed rerouting information to response
+        if rerouting_results:
+            response["rerouting_summary"] = {
+                "total_trains_affected": rerouting_results["total_affected"],
+                "successfully_rerouted": rerouting_results["successfully_rerouted"],
+                "failed_reroutings": rerouting_results["total_affected"] - rerouting_results["successfully_rerouted"],
+                "rerouting_details": rerouting_results["rerouting_info"]
+            }
+        
+        print(f"✅ LIVE TRACK FAILURE PROCESSED - {track_id}")
         
         return jsonify(response)
     
@@ -405,9 +462,44 @@ def get_system_info():
             "total_tracks": len(network.network_graph.tracks) if network and network.network_graph else 0,
             "optimization_enabled": optimizer is not None,
             "pathfinding_enabled": True,
-            "rerouting_enabled": True
+            "rerouting_enabled": True,
+            "live_rerouting_enabled": True
         }
     })
+
+@app.route('/api/tracks', methods=['GET'])
+def get_available_tracks():
+    """Get list of all available tracks for track failure reporting."""
+    try:
+        if not network or not network.network_graph:
+            return jsonify({"error": "System not initialized"}), 500
+        
+        tracks = []
+        for track_id, track_data in network.network_graph.tracks.items():
+            tracks.append({
+                "track_id": track_id,
+                "from_station": track_data.get("from", "Unknown"),
+                "to_station": track_data.get("to", "Unknown"),
+                "status": track_data.get("status", "operational"),
+                "track_type": track_data.get("track_type", "unknown"),
+                "priority": track_data.get("priority", "medium"),
+                "travel_time_minutes": track_data.get("travel_time_minutes", 0),
+                "can_disable": track_data.get("status", "operational") == "operational"
+            })
+        
+        # Sort tracks by from_station, then to_station for consistent UI ordering
+        tracks.sort(key=lambda t: (t["from_station"], t["to_station"]))
+        
+        return jsonify({
+            "status": "success",
+            "tracks": tracks,
+            "total_tracks": len(tracks),
+            "operational_tracks": len([t for t in tracks if t["status"] == "operational"]),
+            "disabled_tracks": len([t for t in tracks if t["status"] == "disabled"])
+        })
+    
+    except Exception as e:
+        return jsonify({"error": f"Failed to get tracks: {str(e)}"}), 500
 
 # --- Error Handlers ---
 
@@ -434,11 +526,12 @@ if __name__ == '__main__':
     print("   GET  /                     - Health check")
     print("   GET  /api/state            - Get current network state")
     print("   POST /api/report-event     - Report train disruption event")
-    print("   POST /api/track-failure    - Report track failure event")
+    print("   POST /api/track-failure    - Report track failure event (LIVE REROUTING)")
     print("   POST /api/track-repair     - Report track repair event")
     print("   POST /api/accept-recommendation - Accept AI recommendation")
     print("   POST /api/reset            - Reset simulation")
     print("   GET  /api/trains           - Get all train information")
+    print("   GET  /api/tracks           - Get all available tracks")
     print("   GET  /api/network-status   - Get network topology and status")
     print("   GET  /api/system-info      - Get system configuration")
     print("="*50)

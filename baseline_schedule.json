@@ -1,0 +1,213 @@
+[
+  {
+    "Train_ID": "12001_SHATABDI",
+    "Train_Type": "Express",
+    "Train_Name": "Express 12001_SHATABDI",
+    "Route": [
+      {
+        "Station_ID": "NDLS",
+        "Station_Name": "NDLS",
+        "Arrival_Time": null,
+        "Departure_Time": "2025-09-20 13:00:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "ANVR",
+        "Arrival_Time": "2025-09-20 13:30:00",
+        "Departure_Time": "2025-09-20 13:32:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "GZB",
+        "Arrival_Time": "2025-09-20 14:00:00",
+        "Departure_Time": null,
+        "Platform": "1"
+      }
+    ],
+    "status": "Delayed ()",
+    "current_delay_mins": 300,
+    "weather": "Clear",
+    "track_condition": "Normal",
+    "day_of_week": "Saturday",
+    "time_of_day": "Morning_Peak"
+  },
+  {
+    "Train_ID": "15005_PASSENGER",
+    "Train_Type": "Passenger",
+    "Train_Name": "Passenger 15005_PASSENGER",
+    "Route": [
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "GZB",
+        "Arrival_Time": null,
+        "Departure_Time": "2025-09-20 08:10:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "SBB",
+        "Station_Name": "SBB",
+        "Arrival_Time": "2025-09-20 08:38:30",
+        "Departure_Time": "2025-09-20 08:40:30",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "NDLS",
+        "Station_Name": "NDLS",
+        "Arrival_Time": "2025-09-20 09:07:00",
+        "Departure_Time": null,
+        "Platform": "1"
+      }
+    ],
+    "status": "On-Time",
+    "current_delay_mins": 0,
+    "weather": "Clear",
+    "track_condition": "Normal",
+    "day_of_week": "Saturday",
+    "time_of_day": "Morning_Peak"
+  },
+  {
+    "Train_ID": "14005_LOCAL",
+    "Train_Type": "Local",
+    "Train_Name": "Local 14005_LOCAL",
+    "Route": [
+      {
+        "Station_ID": "DLI",
+        "Station_Name": "DLI",
+        "Arrival_Time": null,
+        "Departure_Time": "2025-09-20 08:20:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "SHZM",
+        "Station_Name": "SHZM",
+        "Arrival_Time": "2025-09-20 08:38:30",
+        "Departure_Time": "2025-09-20 08:40:30",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "ANVR",
+        "Arrival_Time": "2025-09-20 08:57:00",
+        "Departure_Time": null,
+        "Platform": "1"
+      }
+    ],
+    "status": "On-Time",
+    "current_delay_mins": 0,
+    "weather": "Clear",
+    "track_condition": "Normal",
+    "day_of_week": "Saturday",
+    "time_of_day": "Morning_Peak"
+  },
+  {
+    "Train_ID": "16005_EXPRESS",
+    "Train_Type": "Express",
+    "Train_Name": "Express 16005_EXPRESS",
+    "Route": [
+      {
+        "Station_ID": "MUT",
+        "Station_Name": "MUT",
+        "Arrival_Time": null,
+        "Departure_Time": "2025-09-20 09:00:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "GZB",
+        "Arrival_Time": "2025-09-20 09:40:00",
+        "Departure_Time": "2025-09-20 09:42:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "ANVR",
+        "Arrival_Time": "2025-09-20 10:20:00",
+        "Departure_Time": "2025-09-20 10:22:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "NDLS",
+        "Station_Name": "NDLS",
+        "Arrival_Time": "2025-09-20 11:00:00",
+        "Departure_Time": null,
+        "Platform": "1"
+      }
+    ],
+    "status": "On-Time",
+    "current_delay_mins": 0,
+    "weather": "Clear",
+    "track_condition": "Normal",
+    "day_of_week": "Saturday",
+    "time_of_day": "Off_Peak"
+  },
+  {
+    "Train_ID": "12419_GOMTI",
+    "Train_Type": "Express",
+    "Train_Name": "Express 12419_GOMTI",
+    "Route": [
+      {
+        "Station_ID": "NDLS",
+        "Station_Name": "NDLS",
+        "Arrival_Time": null,
+        "Departure_Time": "2025-09-20 07:45:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "ANVR",
+        "Arrival_Time": "2025-09-20 08:02:30",
+        "Departure_Time": "2025-09-20 08:04:30",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "GZB",
+        "Arrival_Time": "2025-09-20 08:20:00",
+        "Departure_Time": null,
+        "Platform": "1"
+      }
+    ],
+    "status": "On-Time",
+    "current_delay_mins": 0,
+    "weather": "Clear",
+    "track_condition": "Normal",
+    "day_of_week": "Saturday",
+    "time_of_day": "Morning_Peak"
+  },
+  {
+    "Train_ID": "12555_GORAKHDHAM",
+    "Train_Type": "Superfast",
+    "Train_Name": "Superfast 12555_GORAKHDHAM",
+    "Route": [
+      {
+        "Station_ID": "NDLS",
+        "Station_Name": "NDLS",
+        "Arrival_Time": null,
+        "Departure_Time": "2025-09-20 08:05:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "ANVR",
+        "Station_Name": "ANVR",
+        "Arrival_Time": "2025-09-20 08:30:00",
+        "Departure_Time": "2025-09-20 08:32:00",
+        "Platform": "1"
+      },
+      {
+        "Station_ID": "GZB",
+        "Station_Name": "GZB",
+        "Arrival_Time": "2025-09-20 08:55:00",
+        "Departure_Time": null,
+        "Platform": "1"
+      }
+    ],
+    "status": "On-Time",
+    "current_delay_mins": 0,
+    "weather": "Clear",
+    "track_condition": "Normal",
+    "day_of_week": "Saturday",
+    "time_of_day": "Morning_Peak"
+  }
+]
